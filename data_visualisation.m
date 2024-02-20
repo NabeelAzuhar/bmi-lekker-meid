@@ -87,7 +87,6 @@ for neuron = 1:num_neurons
 
         % Collect all spike data for this neuron and direction across all trials
         all_spikes = [];
-        time_window = size(trial(n, direction).spikes,2);
 
         for n = 1:size(trial, 1) % loop through 100 trials
             spikes = trial(n, direction).spikes(neuron, :);
@@ -96,14 +95,14 @@ for neuron = 1:num_neurons
         
         % Calculate the firing rate: number of spikes divided by total time
         % Adjust the time calculation based on your time frame
-        firing_rate = sum(all_spikes) / (size(all_spikes, 2) * time_window);
+        firing_rate = sum(all_spikes) / (size(all_spikes, 2));
         firing_rates(neuron, direction) = firing_rate;
         
         % Calculate the standard deviation of firing rates for this neuron and direction
         trial_rates = zeros(1, size(trial, 1));
-        for n = 1:size(trial, 1)
+        for n = 1:size(trial, 1) % loop through 100 trials
             trial_spikes = trial(n, direction).spikes(neuron, :);
-            trial_rate = sum(trial_spikes) / (length(trial_spikes) * time_window);
+            trial_rate = sum(trial_spikes) / (length(trial_spikes));
             trial_rates(n) = trial_rate;
         end
         std_devs(neuron, direction) = std(trial_rates);
@@ -111,7 +110,7 @@ for neuron = 1:num_neurons
 end
 
 %% Plot tuning curves for a given neuron with error bars
-neuron = 3;
+neuron = 1;
 figure; % Open a new figure for each neuron
 errorbar(1:num_directions, firing_rates(neuron, :), std_devs(neuron, :));
 title(sprintf('Tuning Curve for Neuron %d', neuron));
