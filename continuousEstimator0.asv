@@ -41,10 +41,10 @@ load('monkeydata_training.mat');
 
 %% Test
 
-[explained, score] = positionEstimatorTraining(trial);
-selected_scores = score(:, 1:20);
+cum_var = positionEstimatorTraining(trial);
 
-%%
+hold on;
+plot(cum_var);
 
 % figure;
 % hold on;
@@ -57,7 +57,7 @@ selected_scores = score(:, 1:20);
 
 %% Functions
 
-function [explained, score] = positionEstimatorTraining(trial)
+function [expai] = positionEstimatorTraining(trial)
   % Arguments:
   
   % - training_data:
@@ -129,8 +129,6 @@ function [explained, score] = positionEstimatorTraining(trial)
           total_time_bins = total_time_bins + size(filtered_database{n, k}, 2);
       end
   end
-
-  total_time_bins
 
   pca_array = zeros(total_time_bins, num_neurons);
   current_row = 1;
