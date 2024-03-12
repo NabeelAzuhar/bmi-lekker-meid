@@ -62,22 +62,6 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
         yCoeff = modelParameters.pcr(label, binCount).by;
         x = (firingData - mean(meanFiring))'*xCoeff + xAverage;
         y = (firingData - mean(meanFiring))'*yCoeff + yAverage;
-                
-                WTrain = modelParameters.classify(indexer).wLDA_kNN;
-                pcaDim = modelParameters.classify(indexer).dPCA_kNN;
-                ldaDim = modelParameters.classify(indexer).dLDA_kNN;
-                optimTrain = modelParameters.classify(indexer).wOpt_kNN;
-                meanFiringTrain = modelParameters.classify(indexer).mFire_kNN;
-                % not sure whether it should be the mean from train or test
-                WTest = optimTrain'*(firingData-meanFiringTrain); 
-                
-                
-                outLabel = getKnns(WTest, WTrain);
-                modelParameters.actualLabel = outLabel;
-                if outLabel ~= modelParameters.actualLabel
-                    outLabel = modelParameters.actualLabel;
-                    
-                end
 
         try
             x = x(timeTotal, 1);
@@ -87,13 +71,12 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
             y = y(end, 1);
         end
     
-    elseif timeTotal > 560 % i.e. just keep using the model with the largest length of training time
+    else % i.e. just keep using the model with the largest length of training time
         
         xAverage = modelParameters.averages(13).avX(:,label);
         yAverage = modelParameters.averages(13).avY(:,label);
         xCoeff = modelParameters.pcr(label,13).bx;
         yCoeff = modelParameters.pcr(label,13).by;
-        
         x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))'*xCoeff + xAverage;
         y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))'*yCoeff + yAverage;
         
@@ -104,6 +87,7 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
             x =  x(end,1);
             y = y(end,1);
         end
+
     end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
