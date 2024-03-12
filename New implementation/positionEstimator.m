@@ -49,7 +49,7 @@ function [x,y,modelParameters]= positionEstimator(past_current_trial, modelParam
                 WTest = optimTrain'*(firingData-meanFiringTrain); 
                 
                 
-                outLabel = get_knns(WTest, WTrain);
+                outLabel = getKnns(WTest, WTrain);
                 modelParameters.actualLabel = outLabel;
                 if outLabel ~= modelParameters.actualLabel
                     outLabel = modelParameters.actualLabel;

@@ -1,23 +1,29 @@
 %% Continuous Position Estimator Test Script
-% This function first calls the function "positionEstimatorTraining" to get
-% the relevant modelParameters, and then calls the function
-% "positionEstimator" to decode the trajectory. 
+% This script tests the continuous position estimator by decoding hand
+% trajectory using pre-trained model parameters.
+
+% Clean up
 close all
+
+% Load training data
 load("monkeydata_training.mat")
 
-% Set random number generator
+% Set random number generator seed
 rng(2013);
+
+% Shuffle trial order
 ix = randperm(length(trial));
 
-% Select training and testing data (you can choose to split your data in a different way if you wish)
-trainingData = trial(ix(1:60),:);
-testData = trial(ix(61:end),:);
+% Select training and testing data
+trainingData = trial(ix(1:60), :);
+testData = trial(ix(61:end), :);
 
-fprintf('Testing the continuous position estimator...')
+fprintf('Testing the continuous position estimator...\n')
 
-meanSqError = 0; 
-n_predictions = 0;  
+meanSquaredError = 0;
+nPredictions = 0;
 
+% Initialize figure
 figure
 hold on
 axis square
@@ -25,42 +31,43 @@ grid
 
 % Train Model
 tic
-[modelParameters, firingData] = positionEstimatorTraining(trainingData);
+[modelParams, firingData] = positionEstimatorTraining(trainingData);
 
-for tr=1:size(testData,1)
-    display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);
-    pause(0.001)
-    for direc=randperm(8) 
-        
+for trialIdx = 1:size(testData, 1)
+    fprintf('Decoding block %d out of %d\n', trialIdx, size(testData, 1));
+    
+    % Iterate through directions
+    for direction = randperm(8)
         decodedHandPos = [];
-
-        times=320:20:size(testData(tr,direc).spikes,2);
+        times = 320:20:size(testData(trialIdx, direction).spikes, 2);
         
-        for t=times
+        % Iterate through time steps
+        for t = times
+            pastCurrentTrial.trialId = testData(trialIdx, direction).trialId;
+            pastCurrentTrial.spikes = testData(trialIdx, direction).spikes(:, 1:t); 
+            pastCurrentTrial.decodedHandPos = decodedHandPos;
+            pastCurrentTrial.startHandPos = testData(trialIdx, direction).handPos(1:2, 1);
             
-            past_current_trial.trialId = testData(tr,direc).trialId;
-            past_current_trial.spikes = testData(tr,direc).spikes(:,1:t); 
-            past_current_trial.decodedHandPos = decodedHandPos;
-            past_current_trial.startHandPos = testData(tr,direc).handPos(1:2,1); 
-            
-            
-
-            [decodedPosX, decodedPosY,modelParameters] = positionEstimator(past_current_trial, modelParameters);
-            
+            % Decode hand position
+            [decodedPosX, decodedPosY, modelParams] = positionEstimator(pastCurrentTrial, modelParams);
             
             decodedPos = [decodedPosX; decodedPosY];
             decodedHandPos = [decodedHandPos decodedPos];
             
-            meanSqError = meanSqError + norm(testData(tr,direc).handPos(1:2,t) - decodedPos)^2;
-        
+            % Calculate mean squared error
+            meanSquaredError = meanSquaredError + norm(testData(trialIdx, direction).handPos(1:2, t) - decodedPos)^2;
         end
-        n_predictions = n_predictions+length(times);
+        
+        nPredictions = nPredictions + length(times);
+        
+        % Plot decoded and actual positions
         hold on
-        plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
-        plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
+        plot(decodedHandPos(1,:), decodedHandPos(2,:), 'r');
+        plot(testData(trialIdx, direction).handPos(1, times), testData(trialIdx, direction).handPos(2, times), 'b')
     end
 end
 toc
-legend('Decoded Position', 'Actual Position')
 
-RMSE = sqrt(meanSqError/n_predictions);
+% Add legend and calculate RMSE
+legend('Decoded Position', 'Actual Position')
+RMSE = sqrt(meanSquaredError / nPredictions);
