@@ -49,7 +49,7 @@ function [x,y,modelParameters]= positionEstimator(past_current_trial, modelParam
                 WTest = optimTrain'*(firingData-meanFiringTrain); 
                 
                 
-                outLabel = getKNNs(WTest, WTrain,ldaDim,8);
+                outLabel = get_knns(WTest, WTrain);
                 modelParameters.actualLabel = outLabel;
                 if outLabel ~= modelParameters.actualLabel
                     outLabel = modelParameters.actualLabel;
@@ -140,123 +140,127 @@ function [x,y,modelParameters]= positionEstimator(past_current_trial, modelParam
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%FUNCTIONS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function trialProcessed = bin_and_sqrt(trial, group, to_sqrt)
+% function trialProcessed = bin_and_sqrt(trial, group, to_sqrt)
+% 
+% % Use to re-bin to different resolutions and to sqrt binned spikes (is used
+% % to reduce the effects of any significantly higher-firing neurons, which
+% % could bias dimensionality reduction)
+% 
+% % trial = the given struct
+% % group = new binning resolution - note the current resolution is 1ms
+% % to_sqrt = binary , 1 -> sqrt spikes, 0 -> leave
+% 
+%     trialProcessed = struct;
+%     
+% 
+%     for i = 1: size(trial,2)
+%         for j = 1: size(trial,1)
+% 
+%             all_spikes = trial(j,i).spikes; % spikes is no neurons x no time points
+%             no_neurons = size(all_spikes,1);
+%             no_points = size(all_spikes,2);
+%             t_new = 1: group : no_points +1; % because it might not round add a 1 
+%             spikes = zeros(no_neurons,numel(t_new)-1);
+% 
+%             for k = 1 : numel(t_new) - 1 % get rid of the paddded bin
+%                 spikes(:,k) = sum(all_spikes(:,t_new(k):t_new(k+1)-1),2);
+%             end
+% 
+%             if to_sqrt
+%                 spikes = sqrt(spikes);
+%             end
+% 
+%             trialProcessed(j,i).spikes = spikes;
+% %             trialProcessed(j,i).handPos = trial(j,i).handPos(1:2,:);
+% %             trialProcessed(j,i).bin_size = group; % recorded in ms
+%         end
+%     end
+%     
+% end
+% 
+% 
+% function trialFinal = get_firing_rates(trialProcessed,group,scale_window)
+% 
+% % trial = struct , preferably the struct which has been appropaitely binned
+% % and had low-firing neurons removed if needed
+% % group = binning resolution - depends on whether you have changed it with
+% % the bin_and_sqrt function
+% % scale_window = a scaling parameter for the Gaussian kernel - am
+% % setting at 50 now but feel free to mess around with it
+% 
+%     trialFinal = struct;
+%     win = 10*(scale_window/group);
+%     normstd = scale_window/group;
+%     alpha = (win-1)/(2*normstd);
+%     temp1 = -(win-1)/2 : (win-1)/2;
+%     gausstemp = exp((-1/2) * (alpha * temp1/((win-1)/2)) .^ 2)';
+%     gaussian_window = gausstemp/sum(gausstemp);
+%     
+%     for i = 1: size(trialProcessed,2)
+% 
+%         for j = 1:size(trialProcessed,1)
+%             
+%             hold_rates = zeros(size(trialProcessed(j,i).spikes,1),size(trialProcessed(j,i).spikes,2));
+%             
+%             for k = 1: size(trialProcessed(j,i).spikes,1)
+%                 
+%                 hold_rates(k,:) = conv(trialProcessed(j,i).spikes(k,:),gaussian_window,'same')/(group/1000);
+%             end
+%             
+%             trialFinal(j,i).rates = hold_rates;
+% %             trialFinal(j,i).handPos = trialProcessed(j,i).handPos;
+% %             trialFinal(j,i).bin_size = trialProcessed(j,i).bin_size; % recorded in ms
+%         end
+%     end
+% 
+% end
 
-% Use to re-bin to different resolutions and to sqrt binned spikes (is used
-% to reduce the effects of any significantly higher-firing neurons, which
-% could bias dimensionality reduction)
 
-% trial = the given struct
-% group = new binning resolution - note the current resolution is 1ms
-% to_sqrt = binary , 1 -> sqrt spikes, 0 -> leave
+    function [labels] = get_knns(testing_data, training_data)
+    %GET_KNNS Predicts labels using k-nearest neighbors algorithm.
+    %   
+    %   Inputs:
+    %       testing_data: dim_lda x no. test trials, corresponding to the
+    %                     projection of the trial data after use of PCA-LDA
+    %       training_data: dim_lda x no. training trials, corresponding to the
+    %                      projection of the trial data after use of PCA-LDA
+    %       dim_lda: Model parameter specifying the number of dimensions used 
+    %                for clustering analysis in positionEstimatorTraining
+    %       near_factor: Taking 1/near_factor of each direction's worth of data 
+    %                    as nearest neighbors
+    %
+    %   Outputs:
+    %       labels: Reaching angle/direction labels of the testing data deduced 
+    %               with the k-nearest neighbors algorithm
 
-    trialProcessed = struct;
-    
+    % Reformatting the train and test data
+    train_matrix = training_data';
+    test_matrix = testing_data;
+    train_square_sum = sum(train_matrix .* train_matrix, 2);
+    test_square_sum = sum(test_matrix .* test_matrix, 1);
 
-    for i = 1: size(trial,2)
-        for j = 1: size(trial,1)
+    % Calculate distances
+    all_dists = train_square_sum(:, ones(1, length(test_matrix))) ...
+                + test_square_sum(ones(1, length(train_matrix)), :) ...
+                - 2 * train_matrix * test_matrix;
+    all_dists = all_dists';
 
-            all_spikes = trial(j,i).spikes; % spikes is no neurons x no time points
-            no_neurons = size(all_spikes,1);
-            no_points = size(all_spikes,2);
-            t_new = 1: group : no_points +1; % because it might not round add a 1 
-            spikes = zeros(no_neurons,numel(t_new)-1);
+    % Sort for the k nearest neighbors
+    k = 25; % Or you can calculate it based on the length of the training data
+    [~, sorted] = sort(all_dists, 2);
+    nearest = sorted(:, 1:k);
 
-            for k = 1 : numel(t_new) - 1 % get rid of the paddded bin
-                spikes(:,k) = sum(all_spikes(:,t_new(k):t_new(k+1)-1),2);
-            end
+    % Determine mode direction for these k-nearest neighbors
+    no_train = size(training_data, 2) / 8;
+    dir_labels = [ones(1, no_train), 2 * ones(1, no_train), ...
+                  3 * ones(1, no_train), 4 * ones(1, no_train), ...
+                  5 * ones(1, no_train), 6 * ones(1, no_train), ...
+                  7 * ones(1, no_train), 8 * ones(1, no_train)]';
+    nearest_labels = reshape(dir_labels(nearest), [], k);
+    labels = mode(mode(nearest_labels, 2));
 
-            if to_sqrt
-                spikes = sqrt(spikes);
-            end
-
-            trialProcessed(j,i).spikes = spikes;
-%             trialProcessed(j,i).handPos = trial(j,i).handPos(1:2,:);
-%             trialProcessed(j,i).bin_size = group; % recorded in ms
-        end
     end
-    
-end
 
-
-function trialFinal = get_firing_rates(trialProcessed,group,scale_window)
-
-% trial = struct , preferably the struct which has been appropaitely binned
-% and had low-firing neurons removed if needed
-% group = binning resolution - depends on whether you have changed it with
-% the bin_and_sqrt function
-% scale_window = a scaling parameter for the Gaussian kernel - am
-% setting at 50 now but feel free to mess around with it
-
-    trialFinal = struct;
-    win = 10*(scale_window/group);
-    normstd = scale_window/group;
-    alpha = (win-1)/(2*normstd);
-    temp1 = -(win-1)/2 : (win-1)/2;
-    gausstemp = exp((-1/2) * (alpha * temp1/((win-1)/2)) .^ 2)';
-    gaussian_window = gausstemp/sum(gausstemp);
-    
-    for i = 1: size(trialProcessed,2)
-
-        for j = 1:size(trialProcessed,1)
-            
-            hold_rates = zeros(size(trialProcessed(j,i).spikes,1),size(trialProcessed(j,i).spikes,2));
-            
-            for k = 1: size(trialProcessed(j,i).spikes,1)
-                
-                hold_rates(k,:) = conv(trialProcessed(j,i).spikes(k,:),gaussian_window,'same')/(group/1000);
-            end
-            
-            trialFinal(j,i).rates = hold_rates;
-%             trialFinal(j,i).handPos = trialProcessed(j,i).handPos;
-%             trialFinal(j,i).bin_size = trialProcessed(j,i).bin_size; % recorded in ms
-        end
-    end
-
-end
-
-
-function [outLabels] = getKNNs(WTest, WTrain,dimLDA,nearFactor)
-
-
-    % Inputs:
-    % testingData: dimLDA x no. test trials, corresponding to the
-    % projection of the trial data after use of PCA-LDA
-    % trainingData: dimLDA x no. training trials, corresponding to the
-    % projection of the trial data after use of PCA-LDA
-    % dimLDA: model parameter that is used in positionEstimatorTraining to
-    % fix how many dimensions we are use for clustering analysis
-    % nearFactor: taking 1/nearFactor of each directions worth of data as
-    % nearest neighbours
-    
-    % Outputs:
-    % labels: reaching angle/direction labels of the testing data deduced with the kNN
-    % algorithm
-    
-    trainMat = WTrain';
-    testMat = WTest;
-    trainSq = sum(trainMat.*trainMat,2);
-    testSq = sum(testMat.*testMat,1);
-    % allDists has dimensions no. test points x no. train points
-    % i.e for every test point down a column, it's distance from every
-    % training point is across a row
-    allDists = trainSq(:,ones(1,length(testMat))) + testSq(ones(1,length(trainMat)),:) - 2*trainMat*testMat;
-    allDists = allDists';
-
-
-    % sort for the k nearest neigbours
-%     k = round(length(WTrain)/(6*nearFactor)); % i.e. comparing to 1/4 of the amount of trials for one direction
-    k = 25;
-    [~,sorted] = sort(allDists,2);
-    nearest = sorted(:,1:k);
-
-    % what is the mode direction for these k-nearest neighbours?
-    noTrain = size(WTrain,2)/8;
-    dirLabels = [1*ones(1,noTrain),2*ones(1,noTrain),3*ones(1,noTrain),4*ones(1,noTrain),5*ones(1,noTrain),6*ones(1,noTrain),7*ones(1,noTrain),8*ones(1,noTrain)]';
-    nearestLabs =  reshape(dirLabels(nearest),[],k);
-    outLabels =  mode(mode(nearestLabs,2));
-
-end
 
 
 end
