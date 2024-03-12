@@ -115,6 +115,7 @@ for trimmer = timePoints
     modelParameters.classify(count).mFire_kNN = mean(firingData,2);
     count = count+1;
 end
+
 %PCR 
 % https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Principal_Components_Regression.pdf
 

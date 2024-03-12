@@ -24,7 +24,7 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
     dataFinal = get_firing_rates(dataProcessed, binSize, window); % convert binned data into firing rate (including smoothing)
     timeTotal = size(testData.spikes, 2); % total (ending) time, start time is 320ms, algorithm iterated every 20ms
     
-    % Determine label
+    % Determine outLabel
     if timeTotal <= 560
     
         dataFinal.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
@@ -45,41 +45,41 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
         end
     
     else % i.e. just keep using the parameters derived with the largest length of training time
+        label = modelParameters.actualLabel;
         dataFinal.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataFinal.rates, [], 1); % reshape firing rate data into one column
-        label = modelParameters.actualLabel;
     end
     
-    % Use outputted label to predict x and y positions
-    if timeTotal <= 560
+    % Use outlabel to predict x and y positions
+    if timeTotal <=560
         
-        % Compute x and y
+        % introduce a time shift to the data
         binCount =  (timeTotal/binSize) - (timeStart/binSize) + 1;
-        xAverage = modelParameters.averages(binCount).avX(:, label);
-        yAverage = modelParameters.averages(binCount).avY(:, label);
+        avX = modelParameters.averages(binCount).avX(:, label);
+        avY = modelParameters.averages(binCount).avY(:, label);
         meanFiring = modelParameters.pcr(label, binCount).fMean;
-        xCoeff = modelParameters.pcr(label, binCount).bx;
-        yCoeff = modelParameters.pcr(label, binCount).by;
-        x = (firingData - mean(meanFiring))'*xCoeff + xAverage;
-        y = (firingData - mean(meanFiring))'*yCoeff + yAverage;
+        bx = modelParameters.pcr(label, binCount).bx;
+        by = modelParameters.pcr(label, binCount).by;
+        x = (firingData - mean(meanFiring))'*bx + avX;
+        y = (firingData - mean(meanFiring))'*by + avY;
 
         try
-            x = x(timeTotal, 1);
-            y = y(timeTotal, 1);
+            x = x(timeTotal,1);
+            y = y(timeTotal,1);
         catch
-            x =  x(end, 1);
-            y = y(end, 1);
+            x =  x(end,1);
+            y = y(end,1);
         end
     
     elseif timeTotal > 560 % i.e. just keep using the model with the largest length of training time
         
-        xAverage = modelParameters.averages(13).avX(:,label);
-        yAverage = modelParameters.averages(13).avY(:,label);
-        xCoeff = modelParameters.pcr(label,13).bx;
-        yCoeff = modelParameters.pcr(label,13).by;
+        avX = modelParameters.averages(13).avX(:,label);
+        avY = modelParameters.averages(13).avY(:,label);
+        bx = modelParameters.pcr(label,13).bx;
+        by = modelParameters.pcr(label,13).by;
         
-        x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))'*xCoeff + xAverage;
-        y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))'*yCoeff + yAverage;
+        x = (firingData(1:length(bx)) - mean(firingData(1:length(bx))))'*bx + avX;
+        y = (firingData(1:length(by)) - mean(firingData(1:length(by))))'*by + avY;
         
         try
             x =  x(timeTotal,1);
