@@ -62,6 +62,22 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
         yCoeff = modelParameters.pcr(label, binCount).by;
         x = (firingData - mean(meanFiring))'*xCoeff + xAverage;
         y = (firingData - mean(meanFiring))'*yCoeff + yAverage;
+                
+                WTrain = modelParameters.classify(indexer).wLDA_kNN;
+                pcaDim = modelParameters.classify(indexer).dPCA_kNN;
+                ldaDim = modelParameters.classify(indexer).dLDA_kNN;
+                optimTrain = modelParameters.classify(indexer).wOpt_kNN;
+                meanFiringTrain = modelParameters.classify(indexer).mFire_kNN;
+                % not sure whether it should be the mean from train or test
+                WTest = optimTrain'*(firingData-meanFiringTrain); 
+                
+                
+                outLabel = getKnns(WTest, WTrain);
+                modelParameters.actualLabel = outLabel;
+                if outLabel ~= modelParameters.actualLabel
+                    outLabel = modelParameters.actualLabel;
+                    
+                end
 
         try
             x = x(timeTotal, 1);
@@ -169,50 +185,47 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
 % end
 
 
-    function [labels] = get_knns(testing_data, training_data)
-    %GET_KNNS Predicts labels using k-nearest neighbors algorithm.
+    function [labels] = getKnns(testingData, trainingData)
+    %GetKnns Predicts labels using k-nearest neighbors algorithm.
     %   
     %   Inputs:
-    %       testing_data: dim_lda x no. test trials, corresponding to the
+    %       testingData: DimLda x no. test trials, corresponding to the
+    %                    projection of the trial data after use of PCA-LDA
+    %       trainingData: DimLda x no. training trials, corresponding to the
     %                     projection of the trial data after use of PCA-LDA
-    %       training_data: dim_lda x no. training trials, corresponding to the
-    %                      projection of the trial data after use of PCA-LDA
-    %       dim_lda: Model parameter specifying the number of dimensions used 
-    %                for clustering analysis in positionEstimatorTraining
-    %       near_factor: Taking 1/near_factor of each direction's worth of data 
-    %                    as nearest neighbors
     %
     %   Outputs:
     %       labels: Reaching angle/direction labels of the testing data deduced 
     %               with the k-nearest neighbors algorithm
 
     % Reformatting the train and test data
-    train_matrix = training_data';
-    test_matrix = testing_data;
-    train_square_sum = sum(train_matrix .* train_matrix, 2);
-    test_square_sum = sum(test_matrix .* test_matrix, 1);
+    trainMatrix = trainingData';
+    testMatrix = testingData;
+    trainSquareSum = sum(trainMatrix .* trainMatrix, 2);
+    testSquareSum = sum(testMatrix .* testMatrix, 1);
 
     % Calculate distances
-    all_dists = train_square_sum(:, ones(1, length(test_matrix))) ...
-                + test_square_sum(ones(1, length(train_matrix)), :) ...
-                - 2 * train_matrix * test_matrix;
-    all_dists = all_dists';
+    allDists = trainSquareSum(:, ones(1, length(testMatrix))) ...
+                + testSquareSum(ones(1, length(trainMatrix)), :) ...
+                - 2 * trainMatrix * testMatrix;
+    allDists = allDists';
 
     % Sort for the k nearest neighbors
     k = 25; % Or you can calculate it based on the length of the training data
-    [~, sorted] = sort(all_dists, 2);
+    [~, sorted] = sort(allDists, 2);
     nearest = sorted(:, 1:k);
 
     % Determine mode direction for these k-nearest neighbors
-    no_train = size(training_data, 2) / 8;
-    dir_labels = [ones(1, no_train), 2 * ones(1, no_train), ...
-                  3 * ones(1, no_train), 4 * ones(1, no_train), ...
-                  5 * ones(1, no_train), 6 * ones(1, no_train), ...
-                  7 * ones(1, no_train), 8 * ones(1, no_train)]';
-    nearest_labels = reshape(dir_labels(nearest), [], k);
-    labels = mode(mode(nearest_labels, 2));
+    noTrain = size(trainingData, 2) / 8;
+    dirLabels = [ones(1, noTrain), 2 * ones(1, noTrain), ...
+                  3 * ones(1, noTrain), 4 * ones(1, noTrain), ...
+                  5 * ones(1, noTrain), 6 * ones(1, noTrain), ...
+                  7 * ones(1, noTrain), 8 * ones(1, noTrain)]';
+    nearestLabels = reshape(dirLabels(nearest), [], k);
+    labels = mode(mode(nearestLabels, 2));
 
-    end
+end
+
 
 
 
