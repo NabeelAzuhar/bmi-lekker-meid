@@ -3,7 +3,8 @@
 % trajectory using pre-trained model parameters.
 
 % Clean up
-close all
+clc
+clear all
 
 % Load training data
 load("monkeydata_training.mat")
@@ -29,8 +30,10 @@ hold on
 axis square
 grid
 
+% Start timing
+tic;
+
 % Train Model
-tic
 [modelParams, firingData] = positionEstimatorTraining(trainingData);
 
 for trialIdx = 1:size(testData, 1)
@@ -66,8 +69,12 @@ for trialIdx = 1:size(testData, 1)
         plot(testData(trialIdx, direction).handPos(1, times), testData(trialIdx, direction).handPos(2, times), 'b')
     end
 end
-toc
+
+% End timing
+elapsedTime = toc;
+fprintf('Elapsed time: %.2f seconds.\n', elapsedTime);
 
 % Add legend and calculate RMSE
 legend('Decoded Position', 'Actual Position')
 RMSE = sqrt(meanSquaredError / nPredictions);
+fprintf('Root Mean Squared Error (RMSE): %.2f\n', RMSE);

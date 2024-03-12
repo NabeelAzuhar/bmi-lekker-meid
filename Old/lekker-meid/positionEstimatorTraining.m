@@ -1,47 +1,9 @@
-%%% Team Members: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia
-%%% Badea
-%%% BMI Spring 2015 (Update 17th March 2015)
-
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %         PLEASE READ BELOW            %
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Function positionEstimator has to return the x and y coordinates of the
-% monkey's hand position for each trial using only data up to that moment
-% in time.
-% You are free to use the whole trials for training the classifier.
-
-% To evaluate performance we require from you two functions:
-
-% A training function named "positionEstimatorTraining" which takes as
-% input the entire (not subsampled) training data set and which returns a
-% structure containing the parameters for the positionEstimator function:
-% function modelParameters = positionEstimatorTraining(training_data)
-% A predictor named "positionEstimator" which takes as input the data
-% starting at 1ms and UP TO the timepoint at which you are asked to
-% decode the hand position and the model parameters given by your training
-% function:
-
-% function [x y] = postitionEstimator(test_data, modelParameters)
-% This function will be called iteratively starting with the neuronal data 
-% going from 1 to 320 ms, then up to 340ms, 360ms, etc. until 100ms before 
-% the end of trial.
-
-
-% Place the positionEstimator.m and positionEstimatorTraining.m into a
-% folder that is named with your official team name.
-
-% Make sure that the output contains only the x and y coordinates of the
-% monkey's hand.
-
-clc;
-clear all;
-
-load('monkeydata_training.mat');
+% clc;
+% clear all;
 
 %% Test
-
-[params] = positionEstimatorTraining(trial);
+% load('monkeydata_training.mat');
+% [params] = positionEstimatorTraining(trial);
 
 %%
 
@@ -80,7 +42,7 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
   %     single structure containing all the learned parameters of your
   %     model and which can be used by the "positionEstimator" function.
 
-  %% Initialising data
+  % Initialising data
   num_trials = size(trainingData, 1);
   num_angles = size(trainingData, 2);
   num_neurons = size(trainingData(1,1).spikes, 1);
@@ -91,7 +53,7 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
 %   rate_database = cell(num_trials, num_angles);
 %   normalised_database = cell(num_trials, num_angles);
 
-  %% Preprocessing
+  % Preprocessing
   for n = 1 : num_trials
       for k = 1 : num_angles
           spike_data = trainingData(n,k).spikes;

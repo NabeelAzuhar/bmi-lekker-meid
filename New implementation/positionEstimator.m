@@ -31,14 +31,14 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
         firingData = reshape(dataFinal.rates, [], 1); % reshape firing rate data into one column
         binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % actual count of bins
 
-        % get weights from the model parameters outputted from training
+        % Get weights from the model parameters outputted from training
         optimTrain = modelParameters.classify(binCount).wOpt_kNN;
         meanFiringTrain = modelParameters.classify(binCount).mFire_kNN;
         WTest = optimTrain' * (firingData - meanFiringTrain); % weights for testing
         WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for training
 
-        % compute label
-        label = get_knns(WTest, WTrain);
+        % Compute label
+        label = getKnns(WTest, WTrain);
         modelParameters.actualLabel = label;
         if label ~= modelParameters.actualLabel
             label = modelParameters.actualLabel;
@@ -93,80 +93,80 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%FUNCTIONS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% function trialProcessed = bin_and_sqrt(trial, group, to_sqrt)
-% 
-% % Use to re-bin to different resolutions and to sqrt binned spikes (is used
-% % to reduce the effects of any significantly higher-firing neurons, which
-% % could bias dimensionality reduction)
-% 
-% % trial = the given struct
-% % group = new binning resolution - note the current resolution is 1ms
-% % to_sqrt = binary , 1 -> sqrt spikes, 0 -> leave
-% 
-%     trialProcessed = struct;
-%     
-% 
-%     for i = 1: size(trial,2)
-%         for j = 1: size(trial,1)
-% 
-%             all_spikes = trial(j,i).spikes; % spikes is no neurons x no time points
-%             no_neurons = size(all_spikes,1);
-%             no_points = size(all_spikes,2);
-%             t_new = 1: group : no_points +1; % because it might not round add a 1 
-%             spikes = zeros(no_neurons,numel(t_new)-1);
-% 
-%             for k = 1 : numel(t_new) - 1 % get rid of the paddded bin
-%                 spikes(:,k) = sum(all_spikes(:,t_new(k):t_new(k+1)-1),2);
-%             end
-% 
-%             if to_sqrt
-%                 spikes = sqrt(spikes);
-%             end
-% 
-%             trialProcessed(j,i).spikes = spikes;
-% %             trialProcessed(j,i).handPos = trial(j,i).handPos(1:2,:);
-% %             trialProcessed(j,i).bin_size = group; % recorded in ms
-%         end
-%     end
-%     
-% end
-% 
-% 
-% function trialFinal = get_firing_rates(trialProcessed,group,scale_window)
-% 
-% % trial = struct , preferably the struct which has been appropaitely binned
-% % and had low-firing neurons removed if needed
-% % group = binning resolution - depends on whether you have changed it with
-% % the bin_and_sqrt function
-% % scale_window = a scaling parameter for the Gaussian kernel - am
-% % setting at 50 now but feel free to mess around with it
-% 
-%     trialFinal = struct;
-%     win = 10*(scale_window/group);
-%     normstd = scale_window/group;
-%     alpha = (win-1)/(2*normstd);
-%     temp1 = -(win-1)/2 : (win-1)/2;
-%     gausstemp = exp((-1/2) * (alpha * temp1/((win-1)/2)) .^ 2)';
-%     gaussian_window = gausstemp/sum(gausstemp);
-%     
-%     for i = 1: size(trialProcessed,2)
-% 
-%         for j = 1:size(trialProcessed,1)
-%             
-%             hold_rates = zeros(size(trialProcessed(j,i).spikes,1),size(trialProcessed(j,i).spikes,2));
-%             
-%             for k = 1: size(trialProcessed(j,i).spikes,1)
-%                 
-%                 hold_rates(k,:) = conv(trialProcessed(j,i).spikes(k,:),gaussian_window,'same')/(group/1000);
-%             end
-%             
-%             trialFinal(j,i).rates = hold_rates;
-% %             trialFinal(j,i).handPos = trialProcessed(j,i).handPos;
-% %             trialFinal(j,i).bin_size = trialProcessed(j,i).bin_size; % recorded in ms
-%         end
-%     end
-% 
-% end
+function trialProcessed = bin_and_sqrt(trial, group, to_sqrt)
+
+% Use to re-bin to different resolutions and to sqrt binned spikes (is used
+% to reduce the effects of any significantly higher-firing neurons, which
+% could bias dimensionality reduction)
+
+% trial = the given struct
+% group = new binning resolution - note the current resolution is 1ms
+% to_sqrt = binary , 1 -> sqrt spikes, 0 -> leave
+
+    trialProcessed = struct;
+    
+
+    for i = 1: size(trial,2)
+        for j = 1: size(trial,1)
+
+            all_spikes = trial(j,i).spikes; % spikes is no neurons x no time points
+            no_neurons = size(all_spikes,1);
+            no_points = size(all_spikes,2);
+            t_new = 1: group : no_points +1; % because it might not round add a 1 
+            spikes = zeros(no_neurons,numel(t_new)-1);
+
+            for k = 1 : numel(t_new) - 1 % get rid of the paddded bin
+                spikes(:,k) = sum(all_spikes(:,t_new(k):t_new(k+1)-1),2);
+            end
+
+            if to_sqrt
+                spikes = sqrt(spikes);
+            end
+
+            trialProcessed(j,i).spikes = spikes;
+%             trialProcessed(j,i).handPos = trial(j,i).handPos(1:2,:);
+%             trialProcessed(j,i).bin_size = group; % recorded in ms
+        end
+    end
+    
+end
+
+
+function trialFinal = get_firing_rates(trialProcessed,group,scale_window)
+
+% trial = struct , preferably the struct which has been appropaitely binned
+% and had low-firing neurons removed if needed
+% group = binning resolution - depends on whether you have changed it with
+% the bin_and_sqrt function
+% scale_window = a scaling parameter for the Gaussian kernel - am
+% setting at 50 now but feel free to mess around with it
+
+    trialFinal = struct;
+    win = 10*(scale_window/group);
+    normstd = scale_window/group;
+    alpha = (win-1)/(2*normstd);
+    temp1 = -(win-1)/2 : (win-1)/2;
+    gausstemp = exp((-1/2) * (alpha * temp1/((win-1)/2)) .^ 2)';
+    gaussian_window = gausstemp/sum(gausstemp);
+    
+    for i = 1: size(trialProcessed,2)
+
+        for j = 1:size(trialProcessed,1)
+            
+            hold_rates = zeros(size(trialProcessed(j,i).spikes,1),size(trialProcessed(j,i).spikes,2));
+            
+            for k = 1: size(trialProcessed(j,i).spikes,1)
+                
+                hold_rates(k,:) = conv(trialProcessed(j,i).spikes(k,:),gaussian_window,'same')/(group/1000);
+            end
+            
+            trialFinal(j,i).rates = hold_rates;
+%             trialFinal(j,i).handPos = trialProcessed(j,i).handPos;
+%             trialFinal(j,i).bin_size = trialProcessed(j,i).bin_size; % recorded in ms
+        end
+    end
+
+end
 
 
     function [labels] = getKnns(testingData, trainingData)
@@ -208,9 +208,6 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
     nearestLabels = reshape(dirLabels(nearest), [], k);
     labels = mode(mode(nearestLabels, 2));
 
-end
-
-
-
+    end
 
 end
