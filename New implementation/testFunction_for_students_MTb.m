@@ -4,15 +4,15 @@
 % the relevant modelParameters, and then calls the function
 % "positionEstimator" to decode the trajectory. 
 
-function RMSE = testFunction_for_students_MTb(teamName)
+function RMSE = testFunction_for_students_MTb()
 
-load monkeydata0.mat
+load monkeydata_training.mat
 
 % Set random number generator
 rng(2013);
 ix = randperm(length(trial));
 
-addpath(teamName);
+% addpath(teamName);
 
 % Select training and testing data (you can choose to split your data in a different way if you wish)
 trainingData = trial(ix(1:50),:);
@@ -28,6 +28,7 @@ hold on
 axis square
 grid
 
+tic;
 % Train Model
 modelParameters = positionEstimatorTraining(trainingData);
 
@@ -68,8 +69,13 @@ end
 
 legend('Decoded Position', 'Actual Position')
 
-RMSE = sqrt(meanSqError/n_predictions) 
+timeElapsed = toc;
 
-rmpath(genpath(teamName))
+RMSE = sqrt(meanSqError/n_predictions);
 
+
+
+% rmpath(genpath(teamName))
+fprintf('RMSE: %.4f\n', RMSE);
+fprintf('Time elapsed: %.4f seconds\n', timeElapsed);
 end
