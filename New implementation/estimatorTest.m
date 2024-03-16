@@ -18,9 +18,11 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     binSize = 20; % binning resolution (ms)
     window = 50; % window length (ms)
     timeStart = 320; % start time of testing (ms)
+    numDirections = 8;
 
     % Data pre-processing
     dataProcessed = dataProcessor(testData, binSize, window);
+    numNeurons = size(dataProcessed(1, 1).rates, 1);
     timeTotal = size(testData.spikes, 2); % total (ending) time, taking the last trial arbitrarily
     
     % Determine label
@@ -29,14 +31,15 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
+        numNeurons = numNeurons - length(modelParameters.lowFirers{1}); % updates neuron number
 
         % get classification weights from the model parameters for KNN
-        optimTrain = modelParameters.classify(binCount).wOpt_kNN;
-        meanFiringTrain = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
-        WTest = optimTrain' * (firingData - meanFiringTrain); % LDA components
+        optimWeights = modelParameters.classify(binCount).wOpt_kNN;
+        meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
+        WTest = optimWeights' * (firingData - meanFiringRates); % LDA components
         WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for LDA
 
-        % compute label
+        % compute label using KNN
         label = getKnns(WTest, WTrain); % label = predicted direciton using knn
         modelParameters.actualLabel = label;
         if label ~= modelParameters.actualLabel
@@ -47,6 +50,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         label = modelParameters.actualLabel;
+     
     end
     
     % Use outputted label to predict x and y positions
@@ -59,8 +63,8 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         meanFiring = modelParameters.pcr(label, binCount).fMean;
         xCoeff = modelParameters.pcr(label, binCount).xM;
         yCoeff = modelParameters.pcr(label, binCount).yM;
-        x = ((firingData(1:length(xCoeff)) - mean(meanFiring(1:length(xCoeff))))'* xCoeff) + xMean;
-        y = ((firingData(1:length(yCoeff)) - mean(meanFiring(1:length(yCoeff))))'* yCoeff) + yMean;
+        x = ((firingData - mean(meanFiring)))'* xCoeff + xMean;
+        y = ((firingData - mean(meanFiring)))'* yCoeff + yMean;
 
         try
             x = x(timeTotal, 1);

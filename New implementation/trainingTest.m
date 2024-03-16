@@ -28,9 +28,10 @@ function [modelParameters] = trainingTest(trainingData)
     count = 1;
 
 % 1. Data Pre-processing + Filtering
-    binSize = 20; % manually set bin size for data binning
+    binSize = 20; % manually set bin size for data binning, 28 bins
     window = 50; % manually set window length for smoothing
     dataProcessed = dataProcessor(trainingData, binSize, window); % dataProcessed.rates = firing rates
+    % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute
 
 % 2. Find neurons with low firing rates for removal
     removed = {}; % data to filter out
@@ -39,13 +40,13 @@ function [modelParameters] = trainingTest(trainingData)
     for angle = 1 : numDirections % each angle
         for trial = 1 : numTrials % each trial
             for bin = 1 : endTime/binSize % each time bin -> taking 28 time bins based on 560ms total time
-                % row: 98 neurons, each 28 time bins, column: 8 directions, each 100 trials
                 firingData(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).rates(:, bin);     
             end
         end
     end
+    % Out: firingData: rows = 98 neurons * 28 bins, columns = 8 angles * 100 trials
 
-    % take the average rate of each neuron across ALL time bins and ALL trials, mark the ones with rates < 0.5
+    % take the average rate of each neuron across both dimensions, mark the ones with rates < 0.5
     lowFiringNeurons = []; % list to store the indices of low-firing neurons
     for neuron = 1 : numNeurons
         avgRate = mean(mean(firingData(neuron:98:end, :)));
@@ -53,11 +54,10 @@ function [modelParameters] = trainingTest(trainingData)
             lowFiringNeurons = [lowFiringNeurons, neuron];
         end
     end
-   
     numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after removing the low firers
     removed{end+1} = lowFiringNeurons; % make sure the same neurons are removed in the test data
     modelParameters.lowFirers = removed; % record low firing neurons to model parameters output
-    clear firingData
+    clear firingData % just in case
     
 % 3. Extract parameters + Training
     % Start with data from 320ms, then iteratively add 20ms until 560ms for training
@@ -75,33 +75,37 @@ function [modelParameters] = trainingTest(trainingData)
                 end
             end
         end
+        % Out: firingCurrent = firing rates data up to the current specified time interval
 
         % remove the low firing neurons from current firing data
         removedRows = []; % rows of data to remove (for low firing neurons at all its time bins)
         for lowFirer = lowFiringNeurons
             removedRows = [removedRows, lowFirer:numNeurons:length(firingCurrent)];
         end
-        firingCurrent(removedRows, :) = []; % remove the rows for the low firers, NOW have numNeuronNew as the number of neurons!
+        firingCurrent(removedRows, :) = []; % remove the rows for the low firers
+        % NOW have numNeuronNew as the number of neurons! (95)
 
     % 3.2 Principal Component Analysis for dimensionality reduction
-        [eigenvectors, eigenvalues] = calcPCA(firingCurrent); % components = data projected onto the PCA axes
-        components = firingCurrent * eigenvectors; % project firing rate data onto eigenvectors
-        components = components./sqrt(sum(components.^2)); % normalisation
+        [components, eigenvalues] = calcPCA(firingCurrent); % components = data projected onto the PCA axes
+        % Out:
+        %   components: projections of data onto eigenvectors, ASCENDING
+        %   eigenvalues: eigenvalues in ASCENDING order
 
         % use variance explained to select how many components from PCA
         explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
         cumExplained = cumsum(explained);
-        numComponents = find(cumExplained >= 0.8, 1, 'first'); % threshold for selecting components is 80% variance
-        components = components(:, end-(numComponents):end); % components are in the order of ascending order so select from end
+        dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
+        components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
         
     % 3.3 Linear Discriminant Analysis
-        ldaDim = 6; % numbers of dimensions to pick for LDA
+        dimLDA = 6; % numbers of dimensions to pick for , arbitrary for now
         
         % tmp = matrix to store average firing data for each angle
         tmp = zeros(size(firingCurrent, 1), numDirections); % temporary place holder, each column = an angle
         for angle = 1: numDirections
             tmp(:, angle) =  mean(firingCurrent(:, numTrials*(angle-1)+1 : angle*numTrials), 2); % taking the mean of each angle across 100 trials
         end
+        % Out: rows = numNeurons * 28 time bins, columns = 8 angles
 
         scatterBetween = (tmp - mean(firingCurrent, 2)) * (tmp - mean(firingCurrent, 2))'; % between-class scatter matrix
         scatterOverall =  (firingCurrent - mean(firingCurrent,2)) * (firingCurrent - mean(firingCurrent,2))';
@@ -109,14 +113,14 @@ function [modelParameters] = trainingTest(trainingData)
         
         [eigVectorsLDA, eigValuesLDA] = eig(((components' * scatterWithin * components)^-1 ) * (components' * scatterBetween * components));
         [~, sortIdx] = sort(diag(eigValuesLDA), 'descend');
-        optParam = components * eigVectorsLDA(:, sortIdx(1:ldaDim)); % optimum parameters
-        weights = optParam' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection
+        optWeights = components * eigVectorsLDA(:, sortIdx(1:dimLDA)); % optimum parameters
+        wLDA = optWeights' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection
 
     % 3.4 Store all the relevant weights for KNN
-        modelParameters.classify(count).wLDA_kNN = weights;
-        modelParameters.classify(count).dPCA_kNN = numComponents;
-        modelParameters.classify(count).dLDA_kNN = ldaDim;
-        modelParameters.classify(count).wOpt_kNN = optParam;
+        modelParameters.classify(count).wLDA_kNN = wLDA;
+        modelParameters.classify(count).dPCA_kNN = dimPCA;
+        modelParameters.classify(count).dLDA_kNN = dimLDA;
+        modelParameters.classify(count).wOpt_kNN = optWeights;
         modelParameters.classify(count).mFire_kNN = mean(firingCurrent, 2);
         count = count + 1;
 
@@ -124,12 +128,12 @@ function [modelParameters] = trainingTest(trainingData)
 
 % 4. Principal Component Regression 
     % xn, yn = x, y position data padded with the last position value of each trial
-    % x, y = sampled x, y position data using the set bin size
+    % x, y = SAMPLED x, y position data using the set bin size (20ms)
     timeIntervals = startTime : binSize : endTime; % 320 : 20 : 560
     [xn, yn, x, y] = positionSampled(trainingData, numDirections, numTrials, binSize);
     xTest = x(:, (timeIntervals)/binSize, :); % select the relevant bins from the sampled data
     yTest = y(:, (timeIntervals)/binSize, :);
-    bins = repelem(timeIntervals, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 8 neurons
+    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 8 neurons
 
     directionLabels = [1 * ones(1, numTrials), ...
              2 * ones(1, numTrials), ...
@@ -142,8 +146,8 @@ function [modelParameters] = trainingTest(trainingData)
     
     for angle = 1: numDirections
         % get the spikes data for each direction
-        xDirection = xTest(:, :, angle);
-        yDirection = yTest(:, :, angle);
+        xDirection = squeeze(xTest(:, :, angle));
+        yDirection = squeeze(yTest(:, :, angle));
         
         for bin = 1: ((endTime-startTime)/binSize) + 1 % go through each testing time index
             % mean removal for PCR
@@ -153,26 +157,24 @@ function [modelParameters] = trainingTest(trainingData)
         % 4.1 PCA
             % select the firing data that corresponds to the iteratively increasing intervals and the given angle
             firingWindowed = firingCurrent(bins <= timeIntervals(bin), directionLabels == angle);
-            [eigenvectors , eigenvalues] = calcPCA(firingWindowed);
-            components = firingWindowed * eigenvectors; % project firing rate data onto eigenvectors
-            components = components./sqrt(sum(components.^2)); % normalisation
+            [components , eigenvalues] = calcPCA(firingWindowed);
 
             % use variance explained to select how many components from PCA
             explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
             cumExplained = cumsum(explained);
-            numComponents = find(cumExplained >= 0.8, 1, 'first'); % threshold for selecting components is 80% variance
-            components = components(:, end-(numComponents):end); % components are in the order of ascending order so select from end
+            dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
+            components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
 
             % project windowed data onto the selected components 
             projection = components' * (firingWindowed - mean(firingWindowed, 1));
 
             % calculate regression coefficients
-            xM = (components * inv(projection*projection') * projection) * xPCR;
-            yM = (components * inv(projection*projection') * projection) * yPCR;
+            xCoeff = (components * inv(projection*projection') * projection) * xPCR;
+            yCoeff = (components * inv(projection*projection') * projection) * yPCR;
 
             % record model parameters
-            modelParameters.pcr(angle, bin).xM = xM;
-            modelParameters.pcr(angle, bin).yM = yM;
+            modelParameters.pcr(angle, bin).xM = xCoeff;
+            modelParameters.pcr(angle, bin).yM = yCoeff;
             modelParameters.pcr(angle, bin).fMean = mean(firingWindowed, 1);
             modelParameters.averages(bin).xMean = squeeze(mean(xn, 1));
             modelParameters.averages(bin).yMean = squeeze(mean(yn, 1));
@@ -212,7 +214,7 @@ function [modelParameters] = trainingTest(trainingData)
                 spikeBins = zeros(numNeurons, numel(binStarts)-1); % binned data, (98 x number of bins)
                 
                 % bin then squareroot the data            
-                for bin = 1 : numel(binStarts)-1 % iterate through each bin
+                for bin = 1 : numel(binStarts) - 1 % iterate through each bin
                     spikeBins(:, bin) = sum(spikeData(:, binStarts(bin):binStarts(bin+1)-1), 2); % sum spike number
                 end
                 spikeBins = sqrt(spikeBins);
@@ -250,7 +252,7 @@ function [modelParameters] = trainingTest(trainingData)
     end % end of function dataProcessor
 
 
-    function [eigenvectors, eigenvalues] = calcPCA(data)
+    function [components, eigenvalues] = calcPCA(data)
     %----------------------------------------------------------------------
         % Manually computes the PCA (since toolboxes are BANNED)
 
@@ -258,16 +260,21 @@ function [modelParameters] = trainingTest(trainingData)
         %   data: firing data
 
         % Return Value:
-        %   eigenvectors: sorted in ascending order
-        %   eigenvalues: sorted in ascending order
+        %   eigenvectors: sorted in ASCENDING order
+        %   eigenvalues: sorted in ASCENDING order
     %----------------------------------------------------------------------
 
         % Compute the eigenvectors and eigenvaues
-        data0Mean = data - mean(data); % mean removal across trials (features) 
+        data0Mean = data - mean(data, 2); % mean removal across trials (features) 
         covMat = cov(data0Mean); % covariance matrix
         [eigenvectors, eigenvalues] = eig(covMat); % get eigenvalues and eigenvectors
+        
+        % Output processing
         eigenvalues = diag(eigenvalues); % only take the non-zero diagonal components, last one is largest
-    end
+        components = data * eigenvectors; % project firing rate data onto eigenvectors
+        components = components./sqrt(sum(components.^2)); % normalisation
+    
+    end % end of calcPCA function
 
 
     function [xn, yn, x, y] = positionSampled(data, numDirections, numTrials, binSize)

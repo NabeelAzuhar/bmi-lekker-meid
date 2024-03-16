@@ -31,7 +31,7 @@ grid
 
 % Train Model
 tic
-[modelParams] = positionEstimatorTraining(trainingData);
+[modelParams] = trainingTest(trainingData);
 
 for trialIdx = 1:size(testData, 1)
     fprintf('Decoding block %d out of %d\n', trialIdx, size(testData, 1));
@@ -49,7 +49,7 @@ for trialIdx = 1:size(testData, 1)
             pastCurrentTrial.startHandcPos = testData(trialIdx, direction).handPos(1:2, 1);
             
             % Decode hand position
-            [decodedPosX, decodedPosY, modelParams] = positionEstimator(pastCurrentTrial, modelParams);
+            [decodedPosX, decodedPosY, modelParams] = estimatorTest(pastCurrentTrial, modelParams);
             
             decodedPos = [decodedPosX; decodedPosY];
             decodedHandPos = [decodedHandPos decodedPos];
