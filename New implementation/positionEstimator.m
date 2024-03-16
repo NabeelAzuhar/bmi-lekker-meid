@@ -1,67 +1,70 @@
 % Last edit: 19/03/22
 % Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
 
-function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
+function [x, y, modelParameters]= positionEstimator(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:
-    % testData: struct with very similar formatting to trial, other than it has the additinal field of starting position
-    % modelParameters: previously saved modelParameters from PCA-LDA analysis using the training dataset
+        % testData: struct with very similar formatting to trial, other than it has the additinal field of starting position
+        % modelParameters: previously saved modelParameters from PCA-LDA analysis using the training dataset
     
     % Outputs:
-    % decodedPosX: predicted X position according to the PCR model
-    % decodedPosY: predicted Y position according to the PCR model
-    % newParameters: any modifications in classification etc stored here
+        % decodedPosX: predicted X position according to the PCR model
+        % decodedPosY: predicted Y position according to the PCR model
+        % newParameters: any modifications in classification etc stored here
     %----------------------------------------------------------------------
             
     % Initialisations
     binSize = 20; % binning resolution (ms)
     window = 50; % window length (ms)
     timeStart = 320; % start time of testing (ms)
+    numDirections = 8;
 
     % Data pre-processing
-    dataProcessed = bin_and_sqrt(testData, binSize, 1); % bin and squareroot data
-    dataFinal = get_firing_rates(dataProcessed, binSize, window); % convert binned data into firing rate (including smoothing)
-    timeTotal = size(testData.spikes, 2); % total (ending) time, start time is 320ms, algorithm iterated every 20ms
+    dataProcessed = dataProcessor(testData, binSize, window);
+    numNeurons = size(dataProcessed(1, 1).rates, 1);
+    timeTotal = size(testData.spikes, 2); % total (ending) time, taking the last trial arbitrarily
     
     % Determine label
-    if timeTotal <= 560
+    if timeTotal <= 560 % if total time is within the preset time bins
     
-        dataFinal.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
-        firingData = reshape(dataFinal.rates, [], 1); % reshape firing rate data into one column
-        binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % actual count of bins
+        dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
+        firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
+        binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
+        numNeurons = numNeurons - length(modelParameters.lowFirers{1}); % updates neuron number
 
-        % Get weights from the model parameters outputted from training
-        optimTrain = modelParameters.classify(binCount).wOpt_kNN;
-        meanFiringTrain = modelParameters.classify(binCount).mFire_kNN;
-        WTest = optimTrain' * (firingData - meanFiringTrain); % weights for testing
-        WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for training
+        % get classification weights from the model parameters for KNN
+        optimWeights = modelParameters.classify(binCount).wOpt_kNN;
+        meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
+        WTest = optimWeights' * (firingData - meanFiringRates); % LDA components
+        WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for LDA
 
-        % Compute label
-        label = getKnns(WTest, WTrain);
+        % compute label using KNN
+        label = getKnns(WTest, WTrain); % label = predicted direciton using knn
         modelParameters.actualLabel = label;
         if label ~= modelParameters.actualLabel
             label = modelParameters.actualLabel;
         end
     
     else % i.e. just keep using the parameters derived with the largest length of training time
-        dataFinal.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
-        firingData = reshape(dataFinal.rates, [], 1); % reshape firing rate data into one column
+        dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
+        firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         label = modelParameters.actualLabel;
+     
     end
     
     % Use outputted label to predict x and y positions
     if timeTotal <= 560
         
-        % Compute x and y
+        % Compute x and y using the predicted label
         binCount =  (timeTotal/binSize) - (timeStart/binSize) + 1;
-        xAverage = modelParameters.averages(binCount).avX(:, label);
-        yAverage = modelParameters.averages(binCount).avY(:, label);
+        xMean = modelParameters.averages(binCount).xMean(:, label);
+        yMean = modelParameters.averages(binCount).yMean(:, label);
         meanFiring = modelParameters.pcr(label, binCount).fMean;
-        xCoeff = modelParameters.pcr(label, binCount).bx;
-        yCoeff = modelParameters.pcr(label, binCount).by;
-        x = (firingData - mean(meanFiring))'*xCoeff + xAverage;
-        y = (firingData - mean(meanFiring))'*yCoeff + yAverage;
+        xCoeff = modelParameters.pcr(label, binCount).xM;
+        yCoeff = modelParameters.pcr(label, binCount).yM;
+        x = ((firingData - mean(meanFiring)))'* xCoeff + xMean;
+        y = ((firingData - mean(meanFiring)))'* yCoeff + yMean;
 
         try
             x = x(timeTotal, 1);
@@ -71,14 +74,14 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
             y = y(end, 1);
         end
     
-    else % i.e. just keep using the model with the largest length of training time
+    else % i.e. just keep using the model with the largest length of training time bin (13)
         
-        xAverage = modelParameters.averages(13).avX(:,label);
-        yAverage = modelParameters.averages(13).avY(:,label);
-        xCoeff = modelParameters.pcr(label,13).bx;
-        yCoeff = modelParameters.pcr(label,13).by;
-        x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))'*xCoeff + xAverage;
-        y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))'*yCoeff + yAverage;
+        xMean = modelParameters.averages(13).xMean(:, label);
+        yMean = modelParameters.averages(13).yMean(:, label);
+        xCoeff = modelParameters.pcr(label, 13).xM;
+        yCoeff = modelParameters.pcr(label, 13).yM;
+        x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))' * xCoeff + xMean;
+        y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))' * yCoeff + yMean;
         
         try
             x =  x(timeTotal,1);
@@ -90,95 +93,86 @@ function [x,y,modelParameters]= positionEstimator(testData, modelParameters)
 
     end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%FUNCTIONS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function trialProcessed = bin_and_sqrt(trial, group, to_sqrt)
-
-% Use to re-bin to different resolutions and to sqrt binned spikes (is used
-% to reduce the effects of any significantly higher-firing neurons, which
-% could bias dimensionality reduction)
-
-% trial = the given struct
-% group = new binning resolution - note the current resolution is 1ms
-% to_sqrt = binary , 1 -> sqrt spikes, 0 -> leave
-
-    trialProcessed = struct;
-    
-
-    for i = 1: size(trial,2)
-        for j = 1: size(trial,1)
-
-            all_spikes = trial(j,i).spikes; % spikes is no neurons x no time points
-            no_neurons = size(all_spikes,1);
-            no_points = size(all_spikes,2);
-            t_new = 1: group : no_points +1; % because it might not round add a 1 
-            spikes = zeros(no_neurons,numel(t_new)-1);
-
-            for k = 1 : numel(t_new) - 1 % get rid of the paddded bin
-                spikes(:,k) = sum(all_spikes(:,t_new(k):t_new(k+1)-1),2);
-            end
-
-            if to_sqrt
-                spikes = sqrt(spikes);
-            end
-
-            trialProcessed(j,i).spikes = spikes;
-%             trialProcessed(j,i).handPos = trial(j,i).handPos(1:2,:);
-%             trialProcessed(j,i).bin_size = group; % recorded in ms
-        end
-    end
-    
-end
 
 
-function trialFinal = get_firing_rates(trialProcessed,group,scale_window)
+% Nested functions --------------------------------------------------------
 
-% trial = struct , preferably the struct which has been appropaitely binned
-% and had low-firing neurons removed if needed
-% group = binning resolution - depends on whether you have changed it with
-% the bin_and_sqrt function
-% scale_window = a scaling parameter for the Gaussian kernel - am
-% setting at 50 now but feel free to mess around with it
+    function [dataProcessed] = dataProcessor(data, binSize, window)
+    %----------------------------------------------------------------------
+        % Re-bins data and squareroot to reduce the effects of anamolies
+        % Transforms spike data into firing rate data
 
-    trialFinal = struct;
-    win = 10*(scale_window/group);
-    normstd = scale_window/group;
-    alpha = (win-1)/(2*normstd);
-    temp1 = -(win-1)/2 : (win-1)/2;
-    gausstemp = exp((-1/2) * (alpha * temp1/((win-1)/2)) .^ 2)';
-    gaussian_window = gausstemp/sum(gausstemp);
-    
-    for i = 1: size(trialProcessed,2)
+        % Arguments:
+        %   data: spike data to be processed
+        %   binSize: binning resolution (time window per bin)
+        %   window: window length for smoothing
 
-        for j = 1:size(trialProcessed,1)
-            
-            hold_rates = zeros(size(trialProcessed(j,i).spikes,1),size(trialProcessed(j,i).spikes,2));
-            
-            for k = 1: size(trialProcessed(j,i).spikes,1)
+        % Return Value:
+        %   dataProcessed: binned, smoothed firing rate data
+    %----------------------------------------------------------------------
+        
+    % Initialisations
+        dataProcessed = struct; % output
+        numNeurons = size(data(1,1).spikes, 1);
+        
+    % Binning & Squarerooting - 20ms bins, sqrt to avoid large values
+        for angle = 1 : size(data, 2)
+            for trial = 1 : size(data, 1)
+         
+                % initialisations
+                spikeData = data(trial, angle).spikes; % extract spike data (98 x time steps)
+                totalTime = size(spikeData, 2); % total number of time steps
+                binStarts = 1 : binSize : totalTime+1; % starting time stamps of each bin
+                spikeBins = zeros(numNeurons, numel(binStarts)-1); % binned data, (98 x number of bins)
                 
-                hold_rates(k,:) = conv(trialProcessed(j,i).spikes(k,:),gaussian_window,'same')/(group/1000);
-            end
-            
-            trialFinal(j,i).rates = hold_rates;
-%             trialFinal(j,i).handPos = trialProcessed(j,i).handPos;
-%             trialFinal(j,i).bin_size = trialProcessed(j,i).bin_size; % recorded in ms
-        end
-    end
+                % bin then squareroot the data            
+                for bin = 1 : numel(binStarts)-1 % iterate through each bin
+                    spikeBins(:, bin) = sum(spikeData(:, binStarts(bin):binStarts(bin+1)-1), 2); % sum spike number
+                end
+                spikeBins = sqrt(spikeBins);
 
-end
+                % fill up the output
+                dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
+            end
+        end
+
+    % Convert spike count per bin into firing rate + Gaussian window for smoothing
+        % Generating the Gaussian window
+        windowWidth = 10 * (window/binSize); % width of gaussian window
+        std = window/binSize; % normalised std
+        alpha = (windowWidth-1) / (2*std); % determines spread of curve (exp coefficient)
+        tmp = -(windowWidth-1)/2 : (windowWidth-1)/2; % symmetric vector ranging about 0
+        gaussTemp = exp((-1/2) * (alpha*tmp/((windowWidth-1)/2)).^2)'; % gaussian window
+        gaussWindow = gaussTemp/sum(gaussTemp); % normalised gaussian window, FINAL to use
+
+        % add smoothened firing rates to the processed data
+        for angle = 1 : size(dataProcessed, 2)
+            for trial = 1 : size(dataProcessed, 1)
+                % rates field to be added
+                firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
+                
+                % convolve window with each neuron for smoothing
+                for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
+                    firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), gaussWindow, 'same') / (binSize/1000);
+                end
+                dataProcessed(trial, angle).rates = firingRates; % add rates as a new field to processed data
+            end
+        end
+
+    end % end of function dataProcessor
 
 
     function [labels] = getKnns(testingData, trainingData)
-    %GetKnns Predicts labels using k-nearest neighbors algorithm.
+    %----------------------------------------------------------------------
+    % GetKnns Predicts labels using k-nearest neighbors algorithm.
     %   
-    %   Inputs:
+    %   Arguments:
     %       testingData: DimLda x no. test trials, corresponding to the
     %                    projection of the trial data after use of PCA-LDA
     %       trainingData: DimLda x no. training trials, corresponding to the
     %                     projection of the trial data after use of PCA-LDA
     %
-    %   Outputs:
+    %   Returns:
     %       labels: Reaching angle/direction labels of the testing data deduced 
     %               with the k-nearest neighbors algorithm
 
@@ -208,6 +202,6 @@ end
     nearestLabels = reshape(dirLabels(nearest), [], k);
     labels = mode(mode(nearestLabels, 2));
 
-    end
+    end % end of KNN function
 
 end
