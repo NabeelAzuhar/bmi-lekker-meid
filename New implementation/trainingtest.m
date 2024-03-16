@@ -1,7 +1,7 @@
-function  [trial_,new_feature_matrix] = trainingtest(trainingData)
+function  [trial_,concatenated_pos] = trainingtest(trainingData)
 [nTrials, nDirections] = size(trainingData);
 binSize = 20;
-std = 30;
+std = 50;
 
 % reachAngles = [30 70 110 150 190 230 310 350]; % given in degrees
 
@@ -15,16 +15,16 @@ endTime = 560; %??
  [trial_,minTrialLen]= prep(trainingData,binSize,std);
 % concatenate trials
 % add get min trial length
-concatenated_array = trial_(1, 1).rates(:,1:minTrialLen)';
-
+concatenated_array =[];
+concatenated_pos =[];
 for dir = 1:nDirections
     for trialN = 1:nTrials
-        if dir ==1 && trialN == 1 
-            continue;
-        end
         concatenated_array = [concatenated_array; trial_(trialN, dir).rates(:,1:minTrialLen)'];
+        concatenated_pos = [concatenated_pos; trial_(trialN, dir).handPos(:,1:minTrialLen)'];
     end
 end
+
+
 disp(size(concatenated_array))
 % remove low firing neurons 
 removers = [];
@@ -56,7 +56,7 @@ n_features = size(feature_matrix,2)*(n_history_bins+1);
 n_timebins = size(feature_matrix,1);
 new_feature_matrix = zeros(n_timebins,n_features);
 for timebin = n_history_bins+1:size(feature_matrix,1)
-    new_feature_matrix(timebin,:) =  reshape(feature_matrix(timebin-n_history_bins:timebin,:), 1, []);
+    new_feature_matrix(timebin,:) =  reshape(feature_matrix(timebin-n_history_bins:timebin,:)', 1, []);
 end 
 
 % remove first n_history_bins from each trial
@@ -71,16 +71,11 @@ for n_trial=1:nTrials*nDirections
 end
 
 new_feature_matrix(rows_to_delete, :) = [];
+concatenated_pos(rows_to_delete, :) = [];
 disp(size(new_feature_matrix))
+disp(size(concatenated_pos))
 
-% concatenated positions = 
 
-% for dir=1:nDirections
-% 
-%     lm = fitlm(X, Y);
-% 
-%     
-% end
 
 
 
