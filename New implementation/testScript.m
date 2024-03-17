@@ -28,3 +28,6 @@ numTimeBins = 16;
 labels = repmat(1:numAngles, numTrials*numTimeBins, 1);
 % labelsx = labels(:);  % Ensure it's a column vector, resulting in a 12800x1 vector
 
+
+
+

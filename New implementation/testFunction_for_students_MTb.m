@@ -35,7 +35,7 @@ tic;
 for tr=1:size(testData,1)
     display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);
     pause(0.001)
-    for direc=randperm(8) 
+    for direc=randperm(8)
         decodedHandPos = [];
 
         times=320:20:size(testData(tr,direc).spikes,2);
@@ -49,6 +49,10 @@ for tr=1:size(testData,1)
             
             if nargout('positionEstimator') == 3
                 [decodedPosX, decodedPosY, newParameters] = positionEstimator(past_current_trial, modelParameters);
+%                 if newParameters.actualLabel ~= direc
+%                     disp(t)
+%                     disp(newParameters.actualLabel)
+%                 end
                 modelParameters = newParameters;
             elseif nargout('positionEstimator') == 2
                 [decodedPosX, decodedPosY] = positionEstimator(past_current_trial, modelParameters);

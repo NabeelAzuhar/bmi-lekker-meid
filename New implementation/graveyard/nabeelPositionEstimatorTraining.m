@@ -140,9 +140,10 @@ function xDirection = nabeelPositionEstimatorTraining(trainingData)
             xDirection = squeeze(xTest(:, :, angle));
             yDirection = squeeze(yTest(:, :, angle));
 
-            % meal removal for PCR
-            xPCR = xDirection(:, intervalIndex) - mean(xDirection(:, intervalIndex));
-            yPCR = yDirection(:, intervalIndex) - mean(yDirection(:, intervalIndex));
+            % mean removal for PCR
+            xPCR = xDirection(:, intervalIndex) - mean(xDirection(:, intervalIndex)); % taking mean of x hand position at the end of the interval
+            yPCR = yDirection(:, intervalIndex) - mean(yDirection(:, intervalIndex)); % taking mean of y hand position at the end of the interval
+            disp(size(xPCR));
 
             % 6.1 PCA
             % select the firing data that corresponds to the iteratively increasing intervals and the given angle
@@ -154,22 +155,23 @@ function xDirection = nabeelPositionEstimatorTraining(trainingData)
             cumExplained = cumsum(explained);
             dimPCA = find(cumExplained >= PCAThreshold, 1, 'first'); % threshold for selecting components is 80% variance
             components = components(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
+            disp(size(components));
 
             % project windowed data onto the selected components 
-            projection = components' * (intervalAngleArray - mean(intervalAngleArray, 1));
+            projection = components' * (intervalAngleArray - mean(intervalAngleArray, 2))';
+            disp(size(projection));
 
             % calculate regression coefficients
             xCoeff = (components * inv(projection*projection') * projection) * xPCR;
             yCoeff = (components * inv(projection*projection') * projection) * yPCR;
 
             % record model parameters
-            modelParameters.pcr(angle, bin).xM = xCoeff;
-            modelParameters.pcr(angle, bin).yM = yCoeff;
-            modelParameters.pcr(angle, bin).fMean = mean(intervalAngleArray, 1);
-            modelParameters.averages(bin).xMean = squeeze(mean(xn, 1));
-            modelParameters.averages(bin).yMean = squeeze(mean(yn, 1));
+            modelParameters.pcr(angle, intervalIndex).xM = xCoeff;
+            modelParameters.pcr(angle, intervalIndex).yM = yCoeff;
+            modelParameters.pcr(angle, intervalIndex).fMean = mean(intervalAngleArray, 1);
+            modelParameters.averages(intervalIndex).xMean = squeeze(mean(xn, 1));
+            modelParameters.averages(intervalIndex).yMean = squeeze(mean(yn, 1));
         end
-
 
         intervalIndex = intervalIndex + 1;
     end
