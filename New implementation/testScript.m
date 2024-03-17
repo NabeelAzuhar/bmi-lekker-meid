@@ -20,3 +20,11 @@ for angle_num = 1:size(data, 2)
 end
 
 % Smallest duration is 571 ms in reaching angle 6 trial 71
+
+%% Trying out LDA formatting
+numAngles = 8;
+numTrials = 100;
+numTimeBins = 16;
+labels = repmat(1:numAngles, numTrials*numTimeBins, 1);
+% labelsx = labels(:);  % Ensure it's a column vector, resulting in a 12800x1 vector
+
