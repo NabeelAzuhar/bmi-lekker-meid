@@ -50,7 +50,7 @@ function [modelParameters] = trainingTest(trainingData)
     lowFiringNeurons = []; % list to store the indices of low-firing neurons
     for neuron = 1 : numNeurons
         avgRate = mean(mean(firingData(neuron:98:end, :)));
-        if avgRate < 0.5 % remove neurons with average rate less than 0.5
+        if avgRate < 1 % remove neurons with average rate less than 0.5
             lowFiringNeurons = [lowFiringNeurons, neuron];
         end
     end
