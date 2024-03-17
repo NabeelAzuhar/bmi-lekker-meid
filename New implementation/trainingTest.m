@@ -133,7 +133,7 @@ function [modelParameters] = trainingTest(trainingData)
     [xn, yn, x, y] = positionSampled(trainingData, numDirections, numTrials, binSize);
     xTest = x(:, (timeIntervals)/binSize, :); % select the relevant bins from the sampled data
     yTest = y(:, (timeIntervals)/binSize, :);
-    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 8 neurons
+    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 95 neurons
 
     directionLabels = [1 * ones(1, numTrials), ...
              2 * ones(1, numTrials), ...
