@@ -1,5 +1,5 @@
 function [modelParameters] = gloriaTraining(trainingData)
-    
+
 %--------------------------------------------------------------------------
     % Arguments:
     
@@ -52,6 +52,7 @@ function [modelParameters] = gloriaTraining(trainingData)
 
 % 2. Generate firing data matrix + filter low firing neurons
     % 2.1 Fetch firing rate data and create matrix
+    firingData = zeros(numNeurons*endTime/binSize, numDirections*numTrials);
     for angle = 1 : numDirections % each angle
         for trial = 1 : numTrials % each trial
             for bin = 1 : endTime/binSize % each time bin -> taking 28 time bins based on 560ms total time
@@ -161,7 +162,6 @@ function [modelParameters] = gloriaTraining(trainingData)
     handPosData = zeros(2*endTime/binSize, numTrials*numDirections);
     xPadded = zeros(numTrials, maxTimeSteps, numDirections);
     yPadded = zeros(numTrials, maxTimeSteps, numDirections);
-
     for angle = 1 : numDirections
         for trial = 1 : numTrials
             xPadded(trial, :, angle) = [trainingData(trial,angle).handPos(1,:), trainingData(trial,angle).handPos(1, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))];

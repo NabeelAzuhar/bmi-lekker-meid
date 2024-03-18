@@ -9,14 +9,14 @@ close all
 load("monkeydata_training.mat")
 
 % Set random number generator seed
-rng(2013);
+% rng(1500);
 
 % Shuffle trial order
 ix = randperm(length(trial));
 
 % Select training and testing data
-trainingData = trial(ix(1:60), :);
-testData = trial(ix(61:end), :);
+trainingData = trial(ix(1:50), :);
+testData = trial(ix(51:end), :);
 
 fprintf('Testing the continuous position estimator...\n')
 
