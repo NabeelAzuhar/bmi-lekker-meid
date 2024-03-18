@@ -99,6 +99,7 @@ function [modelParameters] = trainingTest(trainingData)
         
     % 3.3 Linear Discriminant Analysis
         dimLDA = 6; % numbers of dimensions to pick for , arbitrary for now
+        S_W = zeros()
 
         % Calculate scatter matrices
         % tmp = matrix to store average firing data for each angle
