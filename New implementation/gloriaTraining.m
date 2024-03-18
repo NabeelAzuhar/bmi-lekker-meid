@@ -25,6 +25,8 @@ function [modelParameters] = gloriaTraining(trainingData)
     numDirections = size(trainingData, 2);
     binSize = 20; % manually set bin size for data binning, 28 bins
     window = 30; % manually set window length for smoothing
+    modelParameters.binSize = 20;
+    modelParameters.window = 30;
     
     % determine max and min number of time steps
     timeSteps = [];
@@ -36,6 +38,7 @@ function [modelParameters] = gloriaTraining(trainingData)
     startTime = 320;
     maxTimeSteps = max(timeSteps);
     endTime = floor(min(timeSteps)/binSize) * binSize; % smallest time length in training data rounded to time bin of 20ms
+    modelParameters.endTime = endTime;
 
     % labels for selecting data for a selected angle from firing Data
     labels = repmat(1:numDirections, numTrials, 1);

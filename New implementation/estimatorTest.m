@@ -5,35 +5,36 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:
-        % testData: struct with very similar formatting to trial, other than it has the additinal field of starting position
+        % testData: 1 struct with very similar formatting to trial, other than it has the additinal field of starting position
         % modelParameters: previously saved modelParameters from PCA-LDA analysis using the training dataset
     
     % Outputs:
-        % decodedPosX: predicted X position according to the PCR model
-        % decodedPosY: predicted Y position according to the PCR model
-        % newParameters: any modifications in classification etc stored here
+        % decodedPosX: predicted X position
+        % decodedPosY: predicted Y position
+        % modelParameters: updated parameters
     %----------------------------------------------------------------------
             
     % Initialisations
-    binSize = 20; % binning resolution (ms)
-    window = 30; % window length (ms)
-    timeStart = 320; % start time of testing (ms)
+    binSize = modelParameters.binSize; % binning resolution (ms)
+    window = modelParameters.window; % window length (ms)
+    startTime = 320; % start time of testing (ms)
+    endTime = modelParameters.endTime; % minimum time length in training data
 
     % Data pre-processing
-    dataProcessed = dataProcessor(testData, binSize, window);
-    numNeurons = size(dataProcessed(1, 1).rates, 1);
-    timeTotal = size(testData.spikes, 2); % total (ending) time, taking the last trial arbitrarily
+    dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed
+    % dataProcessed = 1 single struct
+    timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
+    binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
+    
+    % Reformat data
+    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
+    firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
+    % Out: firingData = (2660x1)
     
     % Determine label by KNN classification
-    if timeTotal <= 560 % if total time is within the preset time bins
-    
-        dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
-        firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
-        binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
-        numNeurons = numNeurons - length(modelParameters.lowFirers); % updates neuron number
-        % firingData = (2660x1)
-
-        % get classification weights from the model parameters for KNN
+    if timeTotal <= endTime % if total time is within the preset time bins
+ 
+        % get classification weights from the model parameters for KNN for the corresponding bin interval
         optimWeights = modelParameters.classify(binCount).wOpt_kNN;
         meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
         WTest = optimWeights' * (firingData - meanFiringRates); % test data projecgted onto LDA components
@@ -44,22 +45,17 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         % compute label using KNN
         label = getKnns(WTest, WTrain); % label = predicted direciton using knn
         modelParameters.actualLabel = label;
-        if label ~= modelParameters.actualLabel
-            label = modelParameters.actualLabel;
-        end
     
-    else % i.e. just keep using the parameters derived with the largest length of training time
-        dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
-        firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
+    else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
         label = modelParameters.actualLabel;
      
-    end
+    end % end of KNN classification
+ 
 
     % Use outputted label to predict x and y positions
-    if timeTotal <= 560
+    if timeTotal <= endTime
         
         % Compute x and y using the predicted label
-        binCount =  (timeTotal/binSize) - (timeStart/binSize) + 1;
         xMean = modelParameters.averages(binCount).xMean(:, label);
         yMean = modelParameters.averages(binCount).yMean(:, label);
         meanFiring = modelParameters.pcr(label, binCount).fMean;
@@ -79,24 +75,23 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     
     else % i.e. just keep using the model with the largest length of training time bin (13)
         
-        xMean = modelParameters.averages(13).xMean(:, label);
-        yMean = modelParameters.averages(13).yMean(:, label);
-        xCoeff = modelParameters.pcr(label, 13).xM;
-        yCoeff = modelParameters.pcr(label, 13).yM;
+        xMean = modelParameters.averages(end).xMean(:, label);
+        yMean = modelParameters.averages(end).yMean(:, label);
+        xCoeff = modelParameters.pcr(label, end).xM;
+        yCoeff = modelParameters.pcr(label, end).yM;
         x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))' * xCoeff + xMean;
         y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))' * yCoeff + yMean;
 
         % get end position of interval
         try
-            x = x(timeTotal,1);
-            y = y(timeTotal,1);
+            x = x(timeTotal, 1); % x is PADDED!
+            y = y(timeTotal, 1);
         catch
-            x = x(end,1);
-            y = y(end,1);
+            x = x(end, 1);
+            y = y(end, 1);
         end
 
     end
-
 
 
 % Nested functions --------------------------------------------------------

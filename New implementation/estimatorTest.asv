@@ -5,28 +5,32 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:
-        % testData: struct with very similar formatting to trial, other than it has the additinal field of starting position
+        % testData: 1 struct with very similar formatting to trial, other than it has the additinal field of starting position
         % modelParameters: previously saved modelParameters from PCA-LDA analysis using the training dataset
     
     % Outputs:
-        % decodedPosX: predicted X position according to the PCR model
-        % decodedPosY: predicted Y position according to the PCR model
-        % newParameters: any modifications in classification etc stored here
+        % decodedPosX: predicted X position
+        % decodedPosY: predicted Y position
+        % modelParameters: updated parameters
     %----------------------------------------------------------------------
             
     % Initialisations
-    binSize = 20; % binning resolution (ms)
-    window = 30; % window length (ms)
+    binSize = modelParameters.binSize; % binning resolution (ms)
+    window = modelParameters.window; % window length (ms)
     timeStart = 320; % start time of testing (ms)
+    endTime = modelParameters.endTime; % minimum time length in training data
+    endStartbi
 
     % Data pre-processing
-    dataProcessed = dataProcessor(testData, binSize, window);
-    numNeurons = size(dataProcessed(1, 1).rates, 1);
-    timeTotal = size(testData.spikes, 2); % total (ending) time, taking the last trial arbitrarily
+    dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed
+    % dataProcessed = 1 single struct
+    numNeurons = size(dataProcessed.rates, 1);
+    timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
     
     % Determine label by KNN classification
-    if timeTotal <= 560 % if total time is within the preset time bins
-    
+    if timeTotal <= endTime % if total time is within the preset time bins
+        
+        % Reformat data
         dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
@@ -56,7 +60,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     end
 
     % Use outputted label to predict x and y positions
-    if timeTotal <= 560
+    if timeTotal <= endTime
         
         % Compute x and y using the predicted label
         binCount =  (timeTotal/binSize) - (timeStart/binSize) + 1;
