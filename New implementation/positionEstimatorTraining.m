@@ -1,5 +1,3 @@
-% Last edit: 19/03/22
-% Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
 function [modelParameters] = positionEstimatorTraining(trainingData)
     
 %--------------------------------------------------------------------------
@@ -36,7 +34,6 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute
 
 % 2. Find neurons with low firing rates for removal
-    removed = {}; % data to filter out
  
     % make a matrix of all firing rate
     for angle = 1 : numDirections % each angle
@@ -52,13 +49,12 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
     lowFiringNeurons = []; % list to store the indices of low-firing neurons
     for neuron = 1 : numNeurons
         avgRate = mean(mean(firingData(neuron:98:end, :)));
-        if avgRate < 0.5 % remove neurons with average rate less than 0.5
+        if avgRate < 1 % remove neurons with average rate less than 0.5
             lowFiringNeurons = [lowFiringNeurons, neuron];
         end
     end
     numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after removing the low firers
-    removed{end+1} = lowFiringNeurons; % make sure the same neurons are removed in the test data
-    modelParameters.lowFirers = removed; % record low firing neurons to model parameters output
+    modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to model parameters output
     clear firingData % just in case
     
 % 3. Extract parameters + Training
@@ -96,12 +92,13 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
         % use variance explained to select how many components from PCA
         explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
         cumExplained = cumsum(explained);
-        dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
-        components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
+        dimPCA = find(cumExplained >= 0.8, 1, 'first'); % threshold for selecting components is 80% variance
+        components = components(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
         
     % 3.3 Linear Discriminant Analysis
         dimLDA = 6; % numbers of dimensions to pick for , arbitrary for now
-        
+
+        % Calculate scatter matrices
         % tmp = matrix to store average firing data for each angle
         tmp = zeros(size(firingCurrent, 1), numDirections); % temporary place holder, each column = an angle
         for angle = 1: numDirections
@@ -135,7 +132,7 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
     [xn, yn, x, y] = positionSampled(trainingData, numDirections, numTrials, binSize);
     xTest = x(:, (timeIntervals)/binSize, :); % select the relevant bins from the sampled data
     yTest = y(:, (timeIntervals)/binSize, :);
-    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 8 neurons
+    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 95 neurons
 
     directionLabels = [1 * ones(1, numTrials), ...
              2 * ones(1, numTrials), ...
@@ -164,7 +161,7 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
             % use variance explained to select how many components from PCA
             explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
             cumExplained = cumsum(explained);
-            dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
+            dimPCA = find(cumExplained >= 0.8, 1, 'first'); % threshold for selecting components is 80% variance
             components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
 
             % project windowed data onto the selected components 
@@ -270,6 +267,7 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
         data0Mean = data - mean(data, 2); % mean removal across trials (features) 
         covMat = cov(data0Mean); % covariance matrix
         [eigenvectors, eigenvalues] = eig(covMat); % get eigenvalues and eigenvectors
+        
         
         % Output processing
         eigenvalues = diag(eigenvalues); % only take the non-zero diagonal components, last one is largest

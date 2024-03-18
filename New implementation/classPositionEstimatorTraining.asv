@@ -1,6 +1,10 @@
 % Last edit: 19/03/22
 % Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
 function [modelParameters] = classPositionEstimatorTraining(trainingData)
+========
+function [modelParameters] = gloriaPositionEstimatorTraining(trainingData)
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
     
 %--------------------------------------------------------------------------
     % Arguments:
@@ -27,7 +31,12 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     numDirections = size(trainingData, 2);
     startTime = 320;
     endTime = 560; % smallest time length in training data rounded to time bin of 20ms
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
     count = 1;
+========
+    labels = repmat(1 : numDirections, numTrials, 1); % Creates label vector that identifies the reaching angle for each row
+    labels = labels(:);  % Ensure it's a column vector, resulting in a 12800x1 vector
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
 
 % 1. Data Pre-processing + Filtering
     binSize = 20; % manually set bin size for data binning, 28 bins
@@ -35,6 +44,7 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     dataProcessed = dataProcessor(trainingData, binSize, window); % dataProcessed.rates = firing rates
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute
 
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
 % 2. Find neurons with low firing rates for removal
     removed = {}; % data to filter out
  
@@ -52,10 +62,26 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     lowFiringNeurons = []; % list to store the indices of low-firing neurons
     for neuron = 1 : numNeurons
         avgRate = mean(mean(firingData(neuron:98:end, :)));
+========
+    % 1.1. Find neurons with low firing rates for removal
+    % make a matrix of all firing rate, limit to 28 bins
+    for angle = 1 : numDirections % each angle
+        for trial = 1 : numTrials % each trial
+            for bin = 1 : endTime/binSize % each time bin -> taking 28 time bins based on 560ms total time
+                firingData(numTrials*(angle-1)+trial, numNeurons*(bin-1)+1 : numNeurons*bin) = dataProcessed(trial, angle).rates(:, bin)';     
+            end
+        end
+    end
+    % identify low firing neurons
+    lowFiringNeurons = []; 
+    for neuron = 1 : numNeurons
+        avgRate = mean(mean(firingData(:, neuron:98:end)));
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
         if avgRate < 0.5 % remove neurons with average rate less than 0.5
             lowFiringNeurons = [lowFiringNeurons, neuron];
         end
     end
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
     numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after removing the low firers
     removed{end+1} = lowFiringNeurons; % make sure the same neurons are removed in the test data
     modelParameters.lowFirers = removed; % record low firing neurons to model parameters output
@@ -92,10 +118,46 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         % Out:
         %   components: projections of data onto eigenvectors, ASCENDING
         %   eigenvalues: eigenvalues in ASCENDING order
+========
+    % remove low firing neurons
+    removedCols = []; % rows of data to remove (for low firing neurons at all its time bins)
+    for lowFirer = lowFiringNeurons
+        removedCols = [lowFirer:numNeurons:length(firingData), removedCols];
+    end
+    firingData(:, removedCols) = []; % remove the rows for the low firers
+    modelParameters.lowFirers = lowFiringNeurons;
+    numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after rate filtering
+% Out: firingData: rows = 95 neurons * 28 bins, columns = 8 angles * 100 trials
+
+% 2. Sample hand position data for PCR
+    binIndices = (startTime:binSize:endTime) / binSize; % [16, 17, 18 ... 28]
+    [xPadded, yPadded, xBinned, yBinned] = positionSampled(trainingData, numDirections, numTrials, binSize);
+    % get hand position at the bins between start and end times
+    xInterval = xBinned(:, binIndices, :); % now 1st bin corresponds to the 16th from start time
+    yInterval = yBinned(:, binIndices, :);
+
+% 3. Extract parameters + Training
+    % Start with data from 320ms, then iteratively add 20ms until 560ms 
+    intervalIndex = 1; % interval but starts from 1 (16th bin intialised to be 1)
+
+    for interval = binIndices % iteratively add testing time (add 20ms every iteration)
+
+    % 3.1 Get firing rate data up to the current time interval
+        intervalArray = zeros(numDirections*numTrials, interval*numNeuronsNew);
+        for bin = 1: interval % only taking bins up to the current allowed time (320:20:560 ms)
+            intervalArray(:, numNeuronsNew*(bin-1)+1 : numNeuronsNew*bin) = firingData(:,  numNeuronsNew*(bin-1)+1 : numNeuronsNew*bin);
+        end
+        % Out: intervalArray contain the firing data from 0ms up to the current time bin
+
+    % 3.2 Principal Component Analysis for dimensionality reduction
+        [componentsPCA, eigenvalues] = calcPCA(intervalArray); % components = data projected onto the PCA axes
+        pcaThreshold = 0.7;
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
 
         % use variance explained to select how many components from PCA
         explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
         cumExplained = cumsum(explained);
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
         dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
         components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
         
@@ -188,6 +250,70 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         end
     end
 
+========
+        dimPCA = find(cumExplained >= pcaThreshold, 1, 'first'); % threshold for selecting components is 80% variance
+        componentsPCA = componentsPCA(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
+    
+    % 3.3 Linear Discriminant Analysis for classification
+        
+        % initialisations
+        overallMean = mean(componentsPCA, 1);
+        S_W = zeros(size(componentsPCA,2), size(componentsPCA,2)); % Within-class scatter matrix
+        S_B = zeros(size(componentsPCA,2), size(componentsPCA,2)); % Between-class scatter matrix
+        
+        % Calculate means for each reaching angle
+        for angle = 1:numDirections
+            angleData = componentsPCA(labels == angle, :); % select trial data corresponding to the selected angle
+            angleMean = mean(angleData, 1); % mean across the 100 trials for each feature
+            angleData = angleData - angleMean; % centre angle data
+
+            % within-class scatter
+            S_W = S_W + (angleData' * angleData); % accumuate to S_W
+
+            % between-class scatter
+            meanDiff = angleMean - overallMean;
+            S_B = S_B + (numTrials * (meanDiff' * meanDiff)); % Update S_B
+        end
+
+        % eigenanalysis to look for discriminants (LDA components)
+        dimLDA = 6; % explains 0.999 variances
+        [eigVectors, ~] = eig((S_W^-1 ) * S_B);
+        componentsLDA = eigVectors(:, end-(dimLDA)+1:end); % dimLDA largest components
+        pcaLdaProjection = componentsPCA * componentsLDA; % PCA data projected onto LDA components
+        firingProjection = pcaLdaProjection' * (intervalArray - mean(intervalArray, 1));
+
+        % store parameters for classification
+        modelParameters.classify(intervalIndex).wOpt_kNN = pcaLdaProjection;
+        modelParameters.classify(intervalIndex).wLDA_kNN = firingProjection;
+        modelParameters.classify(intervalIndex).dPCA_kNN = dimPCA;
+        modelParameters.classify(intervalIndex).dLDA_kNN = dimLDA;
+        modelParameters.classify(intervalIndex).mFire_kNN = mean(intervalArray, 1);
+        intervalIndex = intervalIndex + 1;
+    end % end of each interval
+    
+% % 4. Principal Component Regression
+%     timeIntervals = startTime : binSize : endTime;
+%     bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 8 neurons
+% 
+%     % create coefficients for each direction
+%     for angle = 1 : numDirections
+%         % get hand position at current angle
+%         xDirection = squeeze(xInterval(:, :, angle));
+%         yDirection = squeeze(yInterval(:, :, angle));
+% 
+%         for bin = 1 : intervalIndex-1 % 1: 14 (1 corresponds to start time 320ms)
+%             % zero mean position data at selected time bin
+%             xPCR = xDirection(:, bin) - mean(xDirection(:, bin));
+%             yPCR = yDirection(:, bin) - mean(yDirection(:, bin));
+% 
+%         % 4.1 PCA
+%             % select the firing data that corresponds to the iteratively increasing intervals and the given angle
+%             firingWindowed = firingData(labels == angle, bins <= timeIntervals(bin));
+%             [components , eigenvalues] = calcPCA(firingWindowed);
+%         end
+%     end
+    
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
 
 
 % Nested functions --------------------------------------------------------
@@ -213,7 +339,6 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     % Binning & Squarerooting - 20ms bins, sqrt to avoid large values
         for angle = 1 : size(data, 2)
             for trial = 1 : size(data, 1)
-         
                 % initialisations
                 spikeData = data(trial, angle).spikes; % extract spike data (98 x time steps)
                 totalTime = size(spikeData, 2); % total number of time steps
@@ -229,7 +354,6 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
                 % fill up the output
                 dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
                 dataProcessed(trial, angle).handPos = data(trial, angle).handPos(1:2, :); % select only x and y
-
             end
         end
 
@@ -272,7 +396,11 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     %----------------------------------------------------------------------
 
         % Compute the eigenvectors and eigenvaues
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
         data0Mean = data - mean(data, 2); % mean removal across trials (features) 
+========
+        data0Mean = data - mean(data, 1); % mean removal across features
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
         covMat = cov(data0Mean); % covariance matrix
         [eigenvectors, eigenvalues] = eig(covMat); % get eigenvalues and eigenvectors
         
@@ -293,10 +421,10 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         %   binSize = binning resolution of the spiking/rate data
 
         % Return Value:
-        %   xn
-        %   yn
-        %   x
-        %   y   
+        %   xn: original x position data padded with the last value
+        %   yn: original y position data padded with the last value
+        %   x: sampled x position data according to binSize
+        %   y: sampled y position data according to binSize   
     %----------------------------------------------------------------------
 
         % Find the maximum trajectory
@@ -326,7 +454,9 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
             end
         end
     end
+% Nested functions --------------------------------------------------------
 
+<<<<<<<< Updated upstream:New implementation/classPositionEstimatorTraining.asv
     function [classifyParams] = naiveBayesClassification(pcaArray)
         %----------------------------------------------------------------------
         % Performs the naive bayes classification and returns the 
@@ -357,4 +487,6 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     end
 
 
+========
+>>>>>>>> Stashed changes:New implementation/gloriaPositionEstimatorTraining.m
 end
