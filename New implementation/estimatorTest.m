@@ -63,7 +63,9 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         meanFiring = modelParameters.pcr(label, binCount).fMean;
         xCoeff = modelParameters.pcr(label, binCount).xM;
         yCoeff = modelParameters.pcr(label, binCount).yM;
-        x = ((firingData - mean(meanFiring)))'* xCoeff + xMean;
+        ah = ((firingData - mean(meanFiring)))'* xCoeff;
+        oh = xMean;
+        x = ((firingData - mean(meanFiring)))'* xCoeff + xMean; % (792, 1)
         y = ((firingData - mean(meanFiring)))'* yCoeff + yMean;
 
         try
@@ -84,10 +86,10 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))' * yCoeff + yMean;
         
         try
-            x =  x(timeTotal,1);
+            x = x(timeTotal,1);
             y = y(timeTotal,1);
         catch
-            x =  x(end,1);
+            x = x(end,1);
             y = y(end,1);
         end
 

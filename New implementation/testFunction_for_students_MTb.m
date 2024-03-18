@@ -15,8 +15,8 @@ rng(2013);
 ix = randperm(length(trial));
 
 % Select training and testing data
-trainingData = trial(ix(1:50), :);
-testData = trial(ix(51:end), :);
+trainingData = trial(ix(1:60), :);
+testData = trial(ix(61:end), :);
 
 fprintf('Testing the continuous position estimator...\n')
 
@@ -32,7 +32,6 @@ grid
 % Train Model
 tic
 [modelParams]= gloriaTraining(trainingData);
-
 
 for trialIdx = 1:size(testData, 1)
     fprintf('Decoding block %d out of %d\n', trialIdx, size(testData, 1));

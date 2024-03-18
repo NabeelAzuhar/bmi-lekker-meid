@@ -34,7 +34,6 @@ function [modelParameters] = trainingTest(trainingData)
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute
 
 % 2. Find neurons with low firing rates for removal
-    removed = {}; % data to filter out
  
     % make a matrix of all firing rate
     for angle = 1 : numDirections % each angle
@@ -55,8 +54,7 @@ function [modelParameters] = trainingTest(trainingData)
         end
     end
     numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after removing the low firers
-    removed{end+1} = lowFiringNeurons; % make sure the same neurons are removed in the test data
-    modelParameters.lowFirers = removed; % record low firing neurons to model parameters output
+    modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to model parameters output
     clear firingData % just in case
     
 % 3. Extract parameters + Training
