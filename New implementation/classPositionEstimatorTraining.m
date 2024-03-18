@@ -39,10 +39,10 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     removed = {}; % data to filter out
  
     % make a matrix of all firing rate
-    for a = 1 : numDirections % each angle
+    for angle = 1 : numDirections % each angle
         for trial = 1 : numTrials % each trial
             for bin = 1 : endTime/binSize % each time bin -> taking 28 time bins based on 560ms total time
-                firingData(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(a-1)+trial) = dataProcessed(trial, a).rates(:, bin);     
+                firingData(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).rates(:, bin);     
             end
         end
     end
@@ -69,11 +69,11 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
     % 3.1 get firing rate data up to the certain time frame
         % firingData is the unfiltered firing rate data of all neurons at all time bins
         % firingCurrent is the filtered firing rate data including only non-lowfirers for the selected time interval
-        for a = 1: numDirections
+        for angle = 1: numDirections
             for trial = 1: numTrials
                 for bin = 1: interval % only taking bins up to the current allowed time (320:20:560 ms)
                     % firingCurrent is the firing rates up to the current interval
-                    firingCurrent(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(a-1)+trial) = dataProcessed(trial, a).rates(:, bin);     
+                    firingCurrent(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).rates(:, bin);     
                 end
             end
         end
@@ -96,39 +96,34 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         % use variance explained to select how many components from PCA
         explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
         cumExplained = cumsum(explained);
-        dimension1PCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
-        components = components(:, end-(dimension1PCA):end); % components are in the order of ascending order so select from end
+        dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
+        components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
         
-%     % 3.3 Linear Discriminant Analysis
-%         dimLDA = 6; % numbers of dimensions to pick for , arbitrary for now
-%         
-%         % tmp = matrix to store average firing data for each angle
-%         tmp = zeros(size(firingCurrent, 1), numDirections); % temporary place holder, each column = an angle
-%         for angle = 1: numDirections
-%             tmp(:, angle) =  mean(firingCurrent(:, numTrials*(angle-1)+1 : angle*numTrials), 2); % taking the mean of each angle across 100 trials
-%         end
-%         % Out: rows = numNeurons * 28 time bins, columns = 8 angles
-% 
-%         scatterBetween = (tmp - mean(firingCurrent, 2)) * (tmp - mean(firingCurrent, 2))'; % between-class scatter matrix
-%         scatterOverall =  (firingCurrent - mean(firingCurrent,2)) * (firingCurrent - mean(firingCurrent,2))';
-%         scatterWithin = scatterOverall - scatterBetween;
-%         
-%         [eigVectorsLDA, eigValuesLDA] = eig(((components' * scatterWithin * components)^-1 ) * (components' * scatterBetween * components));
-%         [~, sortIdx] = sort(diag(eigValuesLDA), 'descend');
-%         optWeights = components * eigVectorsLDA(:, sortIdx(1:dimLDA)); % optimum parameters
-%         wLDA = optWeights' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection
+    % 3.3 Linear Discriminant Analysis
+        dimLDA = 6; % numbers of dimensions to pick for , arbitrary for now
+        
+        % tmp = matrix to store average firing data for each angle
+        tmp = zeros(size(firingCurrent, 1), numDirections); % temporary place holder, each column = an angle
+        for angle = 1: numDirections
+            tmp(:, angle) =  mean(firingCurrent(:, numTrials*(angle-1)+1 : angle*numTrials), 2); % taking the mean of each angle across 100 trials
+        end
+        % Out: rows = numNeurons * 28 time bins, columns = 8 angles
 
-%     % 3.4 Store all the relevant weights for KNN
-%         modelParameters.classify(count).wLDA_kNN = wLDA;
-%         modelParameters.classify(count).dPCA_kNN = dimPCA;
-%         modelParameters.classify(count).dLDA_kNN = dimLDA;
-%         modelParameters.classify(count).wOpt_kNN = optWeights;
-%         modelParameters.classify(count).mFire_kNN = mean(firingCurrent, 2);
+        scatterBetween = (tmp - mean(firingCurrent, 2)) * (tmp - mean(firingCurrent, 2))'; % between-class scatter matrix
+        scatterOverall =  (firingCurrent - mean(firingCurrent,2)) * (firingCurrent - mean(firingCurrent,2))';
+        scatterWithin = scatterOverall - scatterBetween;
+        
+        [eigVectorsLDA, eigValuesLDA] = eig(((components' * scatterWithin * components)^-1 ) * (components' * scatterBetween * components));
+        [~, sortIdx] = sort(diag(eigValuesLDA), 'descend');
+        optWeights = components * eigVectorsLDA(:, sortIdx(1:dimLDA)); % optimum parameters
+        wLDA = optWeights' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection
 
-    % 3.3 Naive Bayes Classification
-        classificationParams = naiveBayesClassification(firingCurrent);
-        modelParameters = 
-    
+    % 3.4 Store all the relevant weights for KNN
+        modelParameters.classify(count).wLDA_kNN = wLDA;
+        modelParameters.classify(count).dPCA_kNN = dimPCA;
+        modelParameters.classify(count).dLDA_kNN = dimLDA;
+        modelParameters.classify(count).wOpt_kNN = optWeights;
+        modelParameters.classify(count).mFire_kNN = mean(firingCurrent, 2);
         count = count + 1;
 
     end % end of the selected training interval
@@ -151,10 +146,10 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
              7 * ones(1, numTrials), ...
              8 * ones(1, numTrials)];
     
-    for a = 1: numDirections
+    for angle = 1: numDirections
         % get the spikes data for each direction
-        xDirection = squeeze(xTest(:, :, a));
-        yDirection = squeeze(yTest(:, :, a));
+        xDirection = squeeze(xTest(:, :, angle));
+        yDirection = squeeze(yTest(:, :, angle));
         
         for bin = 1: ((endTime-startTime)/binSize) + 1 % go through each testing time index
             % mean removal for PCR
@@ -163,14 +158,14 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
             
         % 4.1 PCA
             % select the firing data that corresponds to the iteratively increasing intervals and the given angle
-            firingWindowed = firingCurrent(bins <= timeIntervals(bin), directionLabels == a);
+            firingWindowed = firingCurrent(bins <= timeIntervals(bin), directionLabels == angle);
             [components , eigenvalues] = calcPCA(firingWindowed);
 
             % use variance explained to select how many components from PCA
             explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
             cumExplained = cumsum(explained);
-            dimension1PCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
-            components = components(:, end-(dimension1PCA):end); % components are in the order of ascending order so select from end
+            dimPCA = find(cumExplained >= 0.7, 1, 'first'); % threshold for selecting components is 80% variance
+            components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
 
             % project windowed data onto the selected components 
             projection = components' * (firingWindowed - mean(firingWindowed, 1));
@@ -180,9 +175,9 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
             yCoeff = (components * inv(projection*projection') * projection) * yPCR;
 
             % record model parameters
-            modelParameters.pcr(a, bin).xM = xCoeff;
-            modelParameters.pcr(a, bin).yM = yCoeff;
-            modelParameters.pcr(a, bin).fMean = mean(firingWindowed, 1);
+            modelParameters.pcr(angle, bin).xM = xCoeff;
+            modelParameters.pcr(angle, bin).yM = yCoeff;
+            modelParameters.pcr(angle, bin).fMean = mean(firingWindowed, 1);
             modelParameters.averages(bin).xMean = squeeze(mean(xn, 1));
             modelParameters.averages(bin).yMean = squeeze(mean(yn, 1));
         end
@@ -211,11 +206,11 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         numNeurons = size(data(1,1).spikes, 1);
         
     % Binning & Squarerooting - 20ms bins, sqrt to avoid large values
-        for a = 1 : size(data, 2)
+        for angle = 1 : size(data, 2)
             for trial = 1 : size(data, 1)
          
                 % initialisations
-                spikeData = data(trial, a).spikes; % extract spike data (98 x time steps)
+                spikeData = data(trial, angle).spikes; % extract spike data (98 x time steps)
                 totalTime = size(spikeData, 2); % total number of time steps
                 binStarts = 1 : binSize : totalTime+1; % starting time stamps of each bin
                 spikeBins = zeros(numNeurons, numel(binStarts)-1); % binned data, (98 x number of bins)
@@ -227,8 +222,8 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
                 spikeBins = sqrt(spikeBins);
 
                 % fill up the output
-                dataProcessed(trial, a).spikes = spikeBins; % spikes are now binned
-                dataProcessed(trial, a).handPos = data(trial, a).handPos(1:2, :); % select only x and y
+                dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
+                dataProcessed(trial, angle).handPos = data(trial, angle).handPos(1:2, :); % select only x and y
 
             end
         end
@@ -243,16 +238,16 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         gaussWindow = gaussTemp/sum(gaussTemp); % normalised gaussian window, FINAL to use
 
         % add smoothened firing rates to the processed data
-        for a = 1 : size(dataProcessed, 2)
+        for angle = 1 : size(dataProcessed, 2)
             for trial = 1 : size(dataProcessed, 1)
                 % rates field to be added
-                firingRates = zeros(size(dataProcessed(trial, a).spikes, 1), size(dataProcessed(trial, a).spikes, 2));
+                firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
                 
                 % convolve window with each neuron for smoothing
-                for neuron = 1 : size(dataProcessed(trial, a).spikes, 1)
-                    firingRates(neuron, :) = conv(dataProcessed(trial, a).spikes(neuron, :), gaussWindow, 'same') / (binSize/1000);
+                for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
+                    firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), gaussWindow, 'same') / (binSize/1000);
                 end
-                dataProcessed(trial, a).rates = firingRates; % add rates as a new field to processed data
+                dataProcessed(trial, angle).rates = firingRates; % add rates as a new field to processed data
             end
         end
 
@@ -311,49 +306,20 @@ function [modelParameters] = classPositionEstimatorTraining(trainingData)
         xn = zeros([numTrials, maxTimeSteps, numDirections]); % 3D matrix
         yn = xn; % copy x for y
     
-        for a = 1: numDirections
+        for angle = 1: numDirections
             for trial = 1:numTrials
                 
                 % Padding position data with the last value
-                xn(trial, :, a) = [data(trial,a).handPos(1,:), data(trial,a).handPos(1, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(a-1) + trial))];
-                yn(trial, :, a) = [data(trial,a).handPos(2,:), data(trial,a).handPos(2, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(a-1) + trial))];  
+                xn(trial, :, angle) = [data(trial,angle).handPos(1,:), data(trial,angle).handPos(1, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))];
+                yn(trial, :, angle) = [data(trial,angle).handPos(2,:), data(trial,angle).handPos(2, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))];  
                 
                 % Resampling x and y according to the binning size
-                tmpX = xn(trial, :, a);
-                tmpY = xn(trial, :, a);
-                x(trial, :, a) = tmpX(1:binSize:end); % sample the position value at every binSize
-                y(trial, :, a) = tmpY(1:binSize:end);
+                tmpX = xn(trial, :, angle);
+                tmpY = xn(trial, :, angle);
+                x(trial, :, angle) = tmpX(1:binSize:end); % sample the position value at every binSize
+                y(trial, :, angle) = tmpY(1:binSize:end);
             end
         end
-    end
-
-    function [classifyParams] = naiveBayesClassification(pcaArray)
-        %----------------------------------------------------------------------
-        % Performs the naive bayes classification and returns the 
-        % classification parameters
-        %     
-        % Arguments:
-            %   pcaArray: flattened array obtained after PCA
-    
-            % Return Value:
-            %   classifyParams: structure containing the mean and variance for
-            %   prediction
-        %----------------------------------------------------------------------
-        % Define labels for reaching angles
-        labels = repmat(1:8, 1, size(pcaArray, 2) / 8);
-    
-        % Train Naive Bayes classifier
-        dimension1PCA = size(pcaArray, 1);
-        means = zeros(dimension1PCA, 8);
-        variances = zeros(dimension1PCA, 8);
-        for a = 1:8
-            means(:, a) = mean(pcaArray(:, labels == a), 2);
-            variances(:, a) = var(pcaArray(:, labels == a), 0, 2);
-        end
-    
-        % Store classification parameters in a struct
-        classifyParams.means = means;
-        classifyParams.variances = variances;
     end
 
 

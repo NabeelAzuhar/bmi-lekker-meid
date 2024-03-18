@@ -1,4 +1,4 @@
-function  [modelParameters,firingData] = positionEstimatorTraining(trainingData)
+function  [modelParameters] = positionEstimatorTraining(trainingData)
 
 % Last edit: 19/03/22
 % Authors: Ciara Gibbs, Fabio Oliva, Yinzhe Wu, Zhiyu Zheng
@@ -71,9 +71,11 @@ for trimmer = timePoints
 
     % supervised labelling for Linear Discrminant Analysis
     dirLabels = [1*ones(1,noTrain),2*ones(1,noTrain),3*ones(1,noTrain),4*ones(1,noTrain),5*ones(1,noTrain),6*ones(1,noTrain),7*ones(1,noTrain),8*ones(1,noTrain)];
-
-    % implement Principal Component Analysis 
+    
+    % implement Principal Component Analysis
+    fprintf('The dimension of firingData: %d %d\n', size(firingData, 1), size(firingData, 2));
     [princComp,eVals]= getPCA(firingData);
+    fprintf('The dimension of princComp: %d %d\n', size(princComp, 1), size(princComp, 2));
     % https://www.doc.ic.ac.uk/~dfg/ProbabilisticInference/old_IDAPILecture15.pdf
 
     % use Linear Discriminant Analysis on Reduced Dimension Firing Data
