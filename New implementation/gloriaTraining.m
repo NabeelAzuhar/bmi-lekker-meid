@@ -50,7 +50,7 @@ function [modelParameters] = gloriaTraining(trainingData)
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute & binned x, y handPos as .handPos
 
 
-% 2. Find neurons with low firing rates for removal
+% 2. Generate firing data matrix
     % 2.1 Fetch firing rate data and create matrix
     for angle = 1 : numDirections % each angle
         for trial = 1 : numTrials % each trial
