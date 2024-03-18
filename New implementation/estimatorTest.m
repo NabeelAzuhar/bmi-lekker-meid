@@ -172,24 +172,23 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     %       labels: Reaching angle/direction labels of the testing data deduced with the k-nearest neighbors algorithm       
 
     % Reformatting the train and test data
-    trainMatrix = trainingData'; % training data projected onto LDA
-    testMatrix = testingData; % testing data projected onto LDA
-    trainSquareSum = sum(trainMatrix .* trainMatrix, 2);
-    testSquareSum = sum(testMatrix .* testMatrix, 1);
+    trainMat = trainingData'; % training data projected onto LDA
+    testMat = testingData; % testing data projected onto LDA
+    trainSquaredSum = sum(trainMat .* trainMat, 2);
+    testSquaredSum = sum(testMat .* testMat, 1);
 
     % Calculate distances
-    allDists = trainSquareSum(:, ones(1, length(testMatrix))) ...
-                + testSquareSum(ones(1, length(trainMatrix)), :) ...
-                - 2 * trainMatrix * testMatrix;
-    allDists = allDists';
+    allDists = trainSquaredSum(:, ones(1, length(testMat))) ...
+                + testSquaredSum(ones(1, length(trainMat)), :) ...
+                - 2 * trainMat * testMat; % calculates the Euclidean distance between each pair of training and testing data points
 
     % Sort for the k nearest neighbors
     k = 25; % Or you can calculate it based on the length of the training data
-    [~, sorted] = sort(allDists, 2);
+    [~, sorted] = sort(allDists', 2);
     nearest = sorted(:, 1: k);
 
-    % Determine mode direction for these k-nearest neighbors
-    numTrain = size(trainingData, 2) / 8;
+    % Determine the direction for the k-nearest neighbors
+    numTrain = size(trainingData, 2) / 8; % number of trials per direction
     dirLabels = [ones(1, numTrain), 2 * ones(1, numTrain), ...
                   3 * ones(1, numTrain), 4 * ones(1, numTrain), ...
                   5 * ones(1, numTrain), 6 * ones(1, numTrain), ...
