@@ -28,6 +28,14 @@ numTimeBins = 16;
 labels = repmat(1:numAngles, numTrials*numTimeBins, 1);
 % labelsx = labels(:);  % Ensure it's a column vector, resulting in a 12800x1 vector
 
+%% Testing out indexing
+A = [1, 2, 3; 4, 5, 6; 7, 8, 9];
+subset = A(1:2, 1:2);
+subset(1, 1) = 100;
+disp(subset)
+disp(A);  % This will output [100, 2, 3; 4, 5, 6; 7, 8, 9]
+
+
 
 
 
