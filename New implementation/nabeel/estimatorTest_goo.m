@@ -1,7 +1,7 @@
 % Last edit: 19/03/22
 % Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
 
-function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
+function [x, y, modelParameters]= estimatorTest_goo(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:

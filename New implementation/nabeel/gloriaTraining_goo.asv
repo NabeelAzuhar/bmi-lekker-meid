@@ -181,18 +181,19 @@ function [modelParameters] = gloriaTraining_goo(trainingData)
             projection = pcaProjection' * (firingWindowed - mean(firingWindowed, 1)); % e.g. (dimPCAx2660) * (2660x100) = (dimPCAx100)
     
             % Create matrix of predictors with polynomial terms
-            degree = 2;
+            degree = 10;
             x_poly = ones(degree, size(xCurrent, 2));
             y_poly = ones(degree, size(yCurrent, 2));
             for i = 1:degree
                 x_poly(i, :) = xCurrent.^i;
+                disp(x_poly)
                 y_poly(i, :) = yCurrent.^i;
             end
-            disp(x_poly)
             
             % calculate regression coefficients - used to multiply with testing data
             xCoeff = (pcaProjection * ((projection*projection') \ projection)) * x_poly'; % (2660xdimPCA * (dimPCA x dimPCA) * (dimPCAx100)) * (100x1)
             yCoeff = (pcaProjection * ((projection*projection') \ projection)) * y_poly'; % = (2660x1)
+%             disp(size(xCoeff))
             
             % record model parameters
             modelParameters.regression(angle, bin).xCoeff = xCoeff;
