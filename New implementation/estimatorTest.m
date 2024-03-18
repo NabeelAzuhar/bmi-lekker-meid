@@ -16,28 +16,30 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
             
     % Initialisations
     binSize = 20; % binning resolution (ms)
-    window = 50; % window length (ms)
+    window = 30; % window length (ms)
     timeStart = 320; % start time of testing (ms)
-    numDirections = 8;
 
     % Data pre-processing
     dataProcessed = dataProcessor(testData, binSize, window);
     numNeurons = size(dataProcessed(1, 1).rates, 1);
     timeTotal = size(testData.spikes, 2); % total (ending) time, taking the last trial arbitrarily
     
-    % Determine label
+    % Determine label by KNN classification
     if timeTotal <= 560 % if total time is within the preset time bins
     
         dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
         numNeurons = numNeurons - length(modelParameters.lowFirers); % updates neuron number
+        % firingData = (2660x1)
 
         % get classification weights from the model parameters for KNN
         optimWeights = modelParameters.classify(binCount).wOpt_kNN;
         meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
         WTest = optimWeights' * (firingData - meanFiringRates); % test data projecgted onto LDA components
         WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for LDA
+        % WTest = (6x1)
+        % WTrain = (6x800)
 
         % compute label using KNN
         label = getKnns(WTest, WTrain); % label = predicted direciton using knn
@@ -52,7 +54,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         label = modelParameters.actualLabel;
      
     end
-    
+
     % Use outputted label to predict x and y positions
     if timeTotal <= 560
         
@@ -63,11 +65,10 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         meanFiring = modelParameters.pcr(label, binCount).fMean;
         xCoeff = modelParameters.pcr(label, binCount).xM;
         yCoeff = modelParameters.pcr(label, binCount).yM;
-        ah = ((firingData - mean(meanFiring)))'* xCoeff;
-        oh = xMean;
         x = ((firingData - mean(meanFiring)))'* xCoeff + xMean; % (792, 1)
         y = ((firingData - mean(meanFiring)))'* yCoeff + yMean;
 
+        % get end position of interval
         try
             x = x(timeTotal, 1);
             y = y(timeTotal, 1);
@@ -84,7 +85,8 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         yCoeff = modelParameters.pcr(label, 13).yM;
         x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))' * xCoeff + xMean;
         y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))' * yCoeff + yMean;
-        
+
+        % get end position of interval
         try
             x = x(timeTotal,1);
             y = y(timeTotal,1);

@@ -16,7 +16,7 @@ function [modelParameters] = gloriaTraining(trainingData)
     % - modelParameters:
     %     single structure containing all the learned parameters of your
     %     model and which can be used by the "positionEstimator" function.
-%------------------
+%--------------------------------------------------------------------------
 
 % Initialisations
     modelParameters = struct; % output
@@ -24,7 +24,7 @@ function [modelParameters] = gloriaTraining(trainingData)
     numTrials = size(trainingData, 1);
     numDirections = size(trainingData, 2);
     binSize = 20; % manually set bin size for data binning, 28 bins
-    window = 50; % manually set window length for smoothing
+    window = 30; % manually set window length for smoothing
     
     % determine max and min number of time steps
     timeSteps = [];
@@ -41,10 +41,9 @@ function [modelParameters] = gloriaTraining(trainingData)
     labels = repmat(1:numDirections, numTrials, 1);
     labels = labels(:);
 
-% 1. Data Pre-processing + Filtering
+% 1. Data Pre-processing
     dataProcessed = dataProcessor(trainingData, binSize, window); % dataProcessed.rates = firing rates
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute & binned x, y handPos as .handPos
-
 
 % 2. Find neurons with low firing rates for removal
     % 2.1 Fetch firing rate data and create matrix
@@ -85,18 +84,17 @@ function [modelParameters] = gloriaTraining(trainingData)
     binIndices = (startTime:binSize:endTime) / binSize; % 16, 17, 18, ... 28
     intervalIdx = 1;
 
-    for interval = binIndices % iteratively add testing time (add 20ms every iteration)
+    for interval = binIndices % iteratively add testing time: 16, 17, 18, ... 28
 
     % 3.1 get firing rate data up to the certain time bin
         firingCurrent = zeros(numNeuronsNew*interval, numDirections*numTrials);
         for bin = 1 : interval
             firingCurrent(numNeuronsNew*(bin-1)+1:numNeuronsNew*bin, :) = firingData(numNeuronsNew*(bin-1)+1:numNeuronsNew*bin, :);
         end
-    % Out: firingCurrent = firing rates data up to the current specified time interval
+    % Out: firingCurrent = firing rates data up to the current specified time interval (interval*95, 8*100)
 
     % 3.2 Principal Component Analysis for dimensionality reduction
         [eigenvectors, eigenvalues] = calcPCA(firingCurrent); % components = data projected onto the PCA axes
-        % reduced along the neuron-bin dimension, eigenvectors = (800 x 800)
         % Out:
         %   eigenvectors: eigenvectors in ASCENDING order, NORMALISED
         %   eigenvalues: eigenvalues in ASCENDING order
@@ -110,13 +108,13 @@ function [modelParameters] = gloriaTraining(trainingData)
         % Out: eigenvectors: updated to only the top x dimensions determined by dimPCA
 
         % Reduce the dimensions of original data by projection onto the new dimensions
-        pcaProjection = firingCurrent * eigenvectors; % e.g. (2660x800) * (800x10) = (2660x10)
+        pcaProjection = firingCurrent * eigenvectors; % e.g. (2660x800) * (800xdimPCA) = (2660xdimPCA)
         pcaProjection = pcaProjection./sqrt(sum(pcaProjection.^2)); % normalisation
     % Out: pcaProjection: projected firingCurrent data, reduced along the angle-trial axis
     
     % 3.3 Linear Discriminant Analysis
         dimLDA = 6;
-        overallMean = mean(firingCurrent, 2); % (2660 x 1), meaning rate for each neuron-bin
+        overallMean = mean(firingCurrent, 2); % (2660 x 1), mean rate for each neuron-bin
 
         % Extract the mean averages for each angle across all trials
         angleMeans = zeros(size(firingCurrent, 1), numDirections); % (2660 x 8)
@@ -135,7 +133,7 @@ function [modelParameters] = gloriaTraining(trainingData)
         fisherCriterion = ((pcaProjection' * S_W * pcaProjection)^-1) * (pcaProjection' * S_B * pcaProjection); % (dimPCA x dimPCA)
         [eigenvectors, eigenvalues] = eig(fisherCriterion);
         [~, sortIdx] = sort(diag(eigenvalues), 'descend');
-        optWeights = pcaProjection * eigenvectors(:, sortIdx(1:dimLDA)); % optimum parameters (95*timeBins x 6)
+        optWeights = pcaProjection * eigenvectors(:, sortIdx(1:dimLDA)); % optimum parameters (2660 x 6)
         wLDA = optWeights' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection (6x800)
         
        % Store all the relevant weights for KNN
@@ -242,7 +240,7 @@ function [modelParameters] = gloriaTraining(trainingData)
                 % bin then squareroot the spike data            
                 for bin = 1 : length(binIndices) - 1 % iterate through each bin
                     spikeBins(:, bin) = sum(spikeData(:, binIndices(bin):binIndices(bin+1)-1), 2); % sum spike number
-                    handPosBins(:, bin) = handPosData(1:2, binIndices(bin)); % sample the hand position at the beginning of each bin
+                    handPosBins(:, bin) = mean(handPosData(1:2, binIndices(bin):binIndices(bin+1)-1), 2); % sample the hand position at the beginning of each bin
                 end
                 spikeBins = sqrt(spikeBins);
 
@@ -282,7 +280,7 @@ function [modelParameters] = gloriaTraining(trainingData)
     function [eigenvectors, eigenvalues] = calcPCA(data)
     %----------------------------------------------------------------------
         % Manually computes the PCA (since toolboxes are BANNED)
-
+    
         % Arguments:
         %   data: firing data
 

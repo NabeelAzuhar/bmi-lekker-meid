@@ -46,7 +46,7 @@ for trialIdx = 1:size(testData, 1)
             pastCurrentTrial.trialId = testData(trialIdx, direction).trialId;
             pastCurrentTrial.spikes = testData(trialIdx, direction).spikes(:, 1:t); 
             pastCurrentTrial.decodedHandPos = decodedHandPos;
-            pastCurrentTrial.startHandcPos = testData(trialIdx, direction).handPos(1:2, 1);
+            pastCurrentTrial.startHandPos = testData(trialIdx, direction).handPos(1:2, 1);
             
             % Decode hand position
             [decodedPosX, decodedPosY, modelParams] = estimatorTest(pastCurrentTrial, modelParams);
