@@ -20,30 +20,27 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     startTime = 320; % start time of testing (ms)
     endTime = modelParameters.endTime; % minimum time length in training data
 
-    % Data pre-processing
-    dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed
-    % dataProcessed = 1 single struct
+% 1. Data pre-processing
+    dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed - 1 single struct
     timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
     binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
     
     % Reformat data
-    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
     % Out: firingData = (2660x1)
     
-    % Determine label by KNN classification
-    if timeTotal <= endTime % if total time is within the preset time bins
+
+% 2. Determine label by KNN classification
+    if timeTotal <= endTime % if total time is within the preset training time bins
  
         % get classification weights from the model parameters for KNN for the corresponding bin interval
-        optimWeights = modelParameters.classify(binCount).wOpt_kNN;
-        meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
-        WTest = optimWeights' * (firingData - meanFiringRates); % test data projecgted onto LDA components
-        WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for LDA
-        % WTest = (6x1)
-        % WTrain = (6x800)
+        testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
+        firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+        testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+        trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
 
         % compute label using KNN
-        label = getKnns(WTest, WTrain); % label = predicted direciton using knn
+        label = getKnns(testLDA, trainLDA); % label = predicted direciton using knn
         modelParameters.actualLabel = label;
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
@@ -52,17 +49,17 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     end % end of KNN classification
  
 
-    % Use outputted label to predict x and y positions
+% 3. Use outputted label to predict x and y positions using Principal Component Regression
     if timeTotal <= endTime
         
-        % Compute x and y using the predicted label
-        xMean = modelParameters.averages(binCount).xMean(:, label);
-        yMean = modelParameters.averages(binCount).yMean(:, label);
-        meanFiring = modelParameters.pcr(label, binCount).fMean;
-        xCoeff = modelParameters.pcr(label, binCount).xM;
-        yCoeff = modelParameters.pcr(label, binCount).yM;
-        x = ((firingData - mean(meanFiring)))'* xCoeff + xMean; % (792, 1)
-        y = ((firingData - mean(meanFiring)))'* yCoeff + yMean;
+    % 3.1. Compute x and y using the predicted label
+        xMean = modelParameters.positionMeans(binCount).xMean(:, label);
+        yMean = modelParameters.positionMeans(binCount).yMean(:, label);
+        firingMean = modelParameters.regression(label, binCount).firingMean;
+        xCoeff = modelParameters.regression(label, binCount).xCoeff;
+        yCoeff = modelParameters.regression(label, binCount).yCoeff;
+        x = ((firingData - mean(firingMean)))'* xCoeff + xMean; % (792, 1) - decoded x for 792 time bins
+        y = ((firingData - mean(firingMean)))'* yCoeff + yMean;
 
         % get end position of interval
         try
@@ -75,10 +72,10 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     
     else % i.e. just keep using the model with the largest length of training time bin
         
-        xMean = modelParameters.averages(end).xMean(:, label);
-        yMean = modelParameters.averages(end).yMean(:, label);
-        xCoeff = modelParameters.pcr(label, end).xM;
-        yCoeff = modelParameters.pcr(label, end).yM;
+        xMean = modelParameters.positionMeans(end).xMean(:, label);
+        yMean = modelParameters.positionMeans(end).yMean(:, label);
+        xCoeff = modelParameters.regression(label, end).xCoeff;
+        yCoeff = modelParameters.regression(label, end).yCoeff;
         x = (firingData(1:length(xCoeff)) - mean(firingData(1:length(xCoeff))))' * xCoeff + xMean;
         y = (firingData(1:length(yCoeff)) - mean(firingData(1:length(yCoeff))))' * yCoeff + yMean;
 
@@ -167,35 +164,34 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     % GetKnns Predicts labels using k-nearest neighbors algorithm.
     %   
     %   Arguments:
-    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data after use of PCA-LDA               
+    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data after               
     %       trainingData: DimLda x no. training trials, corresponding to the projection of the trial data after use of PCA-LDA  
     %
     %   Returns:
     %       labels: Reaching angle/direction labels of the testing data deduced with the k-nearest neighbors algorithm       
 
     % Reformatting the train and test data
-    trainMatrix = trainingData';
-    testMatrix = testingData;
-    trainSquareSum = sum(trainMatrix .* trainMatrix, 2);
-    testSquareSum = sum(testMatrix .* testMatrix, 1);
+    trainMat = trainingData'; % training data projected onto LDA
+    testMat = testingData; % testing data projected onto LDA
+    trainSquaredSum = sum(trainMat .* trainMat, 2);
+    testSquaredSum = sum(testMat .* testMat, 1);
 
     % Calculate distances
-    allDists = trainSquareSum(:, ones(1, length(testMatrix))) ...
-                + testSquareSum(ones(1, length(trainMatrix)), :) ...
-                - 2 * trainMatrix * testMatrix;
-    allDists = allDists';
+    allDists = trainSquaredSum(:, ones(1, length(testMat))) ...
+                + testSquaredSum(ones(1, length(trainMat)), :) ...
+                - 2 * trainMat * testMat; % calculates the Euclidean distance between each pair of training and testing data points
 
     % Sort for the k nearest neighbors
     k = 25; % Or you can calculate it based on the length of the training data
-    [~, sorted] = sort(allDists, 2);
-    nearest = sorted(:, 1:k);
+    [~, sorted] = sort(allDists', 2);
+    nearest = sorted(:, 1: k);
 
-    % Determine mode direction for these k-nearest neighbors
-    noTrain = size(trainingData, 2) / 8;
-    dirLabels = [ones(1, noTrain), 2 * ones(1, noTrain), ...
-                  3 * ones(1, noTrain), 4 * ones(1, noTrain), ...
-                  5 * ones(1, noTrain), 6 * ones(1, noTrain), ...
-                  7 * ones(1, noTrain), 8 * ones(1, noTrain)]';
+    % Determine the direction for the k-nearest neighbors
+    numTrain = size(trainingData, 2) / 8;
+    dirLabels = [ones(1, numTrain), 2 * ones(1, numTrain), ...
+                  3 * ones(1, numTrain), 4 * ones(1, numTrain), ...
+                  5 * ones(1, numTrain), 6 * ones(1, numTrain), ...
+                  7 * ones(1, numTrain), 8 * ones(1, numTrain)]';
     nearestLabels = reshape(dirLabels(nearest), [], k);
     labels = mode(mode(nearestLabels, 2));
 

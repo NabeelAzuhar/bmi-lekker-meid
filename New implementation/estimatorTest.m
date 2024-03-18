@@ -22,6 +22,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
 
 % 1. Data pre-processing
     dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed - 1 single struct
+    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
     binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
     
@@ -40,7 +41,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
 
         % compute label using KNN
-        label = getKnns(testLDA, trainLDA); % label = predicted direciton using knn
+        label = calcKnns(testLDA, trainLDA); % label = predicted direciton using knn
         modelParameters.actualLabel = label;
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
@@ -159,16 +160,17 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     end % end of function dataProcessor
 
 
-    function [labels] = getKnns(testingData, trainingData)
+    function [labels] = calcKnns(testingData, trainingData)
     %----------------------------------------------------------------------
-    % GetKnns Predicts labels using k-nearest neighbors algorithm.
+    % calcKnns Predicts labels using k-nearest neighbors algorithm.
     %   
     %   Arguments:
-    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data after use of PCA-LDA               
-    %       trainingData: DimLda x no. training trials, corresponding to the projection of the trial data after use of PCA-LDA  
+    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data onto LDA components               
+    %       trainingData: DimLda x no. training trials, corresponding to the projection of the trial data onto LDA components  
     %
     %   Returns:
-    %       labels: Reaching angle/direction labels of the testing data deduced with the k-nearest neighbors algorithm       
+    %       labels: Reaching angle/direction labels of the testing data deduced with the k-nearest neighbors algorithm      
+    %----------------------------------------------------------------------
 
     % Reformatting the train and test data
     trainMat = trainingData'; % training data projected onto LDA

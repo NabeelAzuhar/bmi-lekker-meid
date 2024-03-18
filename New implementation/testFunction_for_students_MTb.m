@@ -15,8 +15,8 @@ rng(2013);
 ix = randperm(length(trial));
 
 % Select training and testing data
-trainingData = trial(ix(1:80), :);
-testData = trial(ix(81:end), :);
+trainingData = trial(ix(1:60), :);
+testData = trial(ix(61:end), :);
 
 fprintf('Testing the continuous position estimator...\n')
 
