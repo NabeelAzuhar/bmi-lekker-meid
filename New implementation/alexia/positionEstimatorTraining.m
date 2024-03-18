@@ -1,4 +1,4 @@
-function [modelParameters] = gloriaTraining(trainingData)
+function [modelParameters] = positionEstimatorTraining(trainingData)
     
 %--------------------------------------------------------------------------
     % Arguments:
