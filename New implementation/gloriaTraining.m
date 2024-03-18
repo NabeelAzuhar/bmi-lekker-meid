@@ -44,9 +44,11 @@ function [modelParameters] = gloriaTraining(trainingData)
     labels = repmat(1:numDirections, numTrials, 1);
     labels = labels(:);
 
+   
 % 1. Data Pre-processing
     dataProcessed = dataProcessor(trainingData, binSize, window); % dataProcessed.rates = firing rates
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute & binned x, y handPos as .handPos
+
 
 % 2. Find neurons with low firing rates for removal
     % 2.1 Fetch firing rate data and create matrix
@@ -59,28 +61,6 @@ function [modelParameters] = gloriaTraining(trainingData)
     end
     % Out: firingData (98*28, 8*100): rows = 98 neurons * 28 bins, columns = 8 angles * 100 trials
 
-    % 2.2 Mark the neurons to be removed (with rates < 0.5)
-    lowFiringNeurons = []; % list to store the indices of low-firing neurons
-    for neuron = 1 : numNeurons
-        avgRate = mean(mean(firingData(neuron:98:end, :)));
-        if avgRate < 0.5 % remove neurons with average rate less than 0.5
-            lowFiringNeurons = [lowFiringNeurons, neuron];
-        end
-    end
-    % Out: lowFiringNeurons: a list containing all the low-firing neurons
-
-    % 2.3 Remove the neurons
-    removedRows = []; % rows of data to remove (for low firing neurons at all its time bins)
-    for lowFirer = lowFiringNeurons
-        removedRows = [removedRows, lowFirer:numNeurons:length(firingData)];
-    end
-    firingData(removedRows, :) = []; % remove the rows for the low firers
-    numNeuronsNew = numNeurons - length(lowFiringNeurons); % new number of neurons after removing the low firers
-    modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to model parameters output
-    % Out:
-    %   numNeuronsNew: updated number of neurons after rate filtering
-    %   firingData: filtered rows after neuron removal (removes row corresponding to low firing neurons)
-    
 
 % 3. Extract parameters for classification
     % Start with data from 320ms, then iteratively add 20ms until 560ms for training
@@ -90,9 +70,9 @@ function [modelParameters] = gloriaTraining(trainingData)
     for interval = binIndices % iteratively add testing time: 16, 17, 18, ... 28
 
     % 3.1 get firing rate data up to the certain time bin
-        firingCurrent = zeros(numNeuronsNew*interval, numDirections*numTrials);
+        firingCurrent = zeros(numNeurons*interval, numDirections*numTrials);
         for bin = 1 : interval
-            firingCurrent(numNeuronsNew*(bin-1)+1:numNeuronsNew*bin, :) = firingData(numNeuronsNew*(bin-1)+1:numNeuronsNew*bin, :);
+            firingCurrent(numNeurons*(bin-1)+1:numNeurons*bin, :) = firingData(numNeurons*(bin-1)+1:numNeurons*bin, :);
         end
     % Out: firingCurrent = firing rates data up to the current specified time interval (interval*95, 8*100)
 
@@ -151,8 +131,9 @@ function [modelParameters] = gloriaTraining(trainingData)
 
 
 % 4. Principal Component Regression
+    % we're edging so hard right now
     timeIntervals = startTime : binSize : endTime; % 320 : 20 : 560
-    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % time steps corresponding to the 28 bins replicated for 95 neurons
+    bins = repelem(binSize:binSize:endTime, numNeurons); % time steps corresponding to the 28 bins replicated for 95 neurons
   
     % 4.1 Get the relevent position data
     handPosData = zeros(2*endTime/binSize, numTrials*numDirections);
@@ -255,7 +236,6 @@ function [modelParameters] = gloriaTraining(trainingData)
                 % fill up the output
                 dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
                 dataProcessed(trial, angle).handPos = handPosBins; % select only x and y
-
             end
         end
 
@@ -306,5 +286,7 @@ function [modelParameters] = gloriaTraining(trainingData)
         eigenvalues = diag(eigenvalues); % only take the non-zero diagonal components, last one is largest
     
     end % end of calcPCA function
+
+% Nested functions --------------------------------------------------------
 
 end

@@ -26,7 +26,6 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
     
     % Reformat data
-    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
     % Out: firingData = (2660x1)
     
@@ -188,7 +187,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     nearest = sorted(:, 1: k);
 
     % Determine the direction for the k-nearest neighbors
-    numTrain = size(trainingData, 2) / 8; % number of trials per direction
+    numTrain = size(trainingData, 2) / 8;
     dirLabels = [ones(1, numTrain), 2 * ones(1, numTrain), ...
                   3 * ones(1, numTrain), 4 * ones(1, numTrain), ...
                   5 * ones(1, numTrain), 6 * ones(1, numTrain), ...
