@@ -1,4 +1,4 @@
-function [angleMeans] = gloriaTraining(trainingData)
+function [modelParameters] = gloriaTraining(trainingData)
     
 %--------------------------------------------------------------------------
     % Arguments:
@@ -97,6 +97,7 @@ function [angleMeans] = gloriaTraining(trainingData)
 
         % Reduce the dimensions of original data by projection onto the new dimensions
         pcaProjection = firingCurrent * eigenvectors; % e.g. (2660x800) * (800x10) = (2660x10)
+        pcaProjection = pcaProjection./sqrt(sum(pcaProjection.^2)); % normalisation
     % Out: pcaProjection: projected firingCurrent data, reduced along the angle-trial axis
     
     % 3.3 Linear Discriminant Analysis
@@ -115,9 +116,73 @@ function [angleMeans] = gloriaTraining(trainingData)
         S_W = (firingCurrent - overallMean) * (firingCurrent - overallMean)' - S_B; % (2660x800) * (800x2660) - (2660x2660) = (2660x2660)
 
         % Compute eigen analysis to find directions maximising the S_B/S_W ratio
-        fisherCriterion = (pcaProjection' * S_
+        % pcaProjection = weights we try to optimise to maximise the Fisher Criteron
+        % The vector w that maximizes J(w) is used as the direction along which the data is projected to achieve the best class separability
+        fisherCriterion = ((pcaProjection' * S_W * pcaProjection)^-1) * (pcaProjection' * S_B * pcaProjection); % (dimPCA x dimPCA)
+        [eigenvectors, eigenvalues] = eig(fisherCriterion);
+        [~, sortIdx] = sort(diag(eigenvalues), 'descend');
+        optWeights = pcaProjection * eigenvectors(:, sortIdx(1:dimLDA)); % optimum parameters (95*timeBins x 6)
+        wLDA = optWeights' * (firingCurrent - mean(firingCurrent, 2)); % optimum projection (6x800)
+        
+       % Store all the relevant weights for KNN
+        modelParameters.classify(intervalIdx).wLDA_kNN = wLDA;
+        modelParameters.classify(intervalIdx).dPCA_kNN = dimPCA;
+        modelParameters.classify(intervalIdx).dLDA_kNN = dimLDA;
+        modelParameters.classify(intervalIdx).wOpt_kNN = optWeights;
+        modelParameters.classify(intervalIdx).mFire_kNN = mean(firingCurrent, 2);
+        intervalIdx = intervalIdx + 1;
 
     end % end of current interval
+
+% 4. Principal Component Regression 
+    timeIntervals = startTime : binSize : endTime; % 320 : 20 : 560
+
+    % 4.1 Get sampled x and y position data
+    [xPadded, yPadded, xBinned, yBinned] = positionSampled(trainingData, numDirections, numTrials, binSize);
+    x = xBinned(:, (timeIntervals)/binSize, :); % select the relevant bins from the sampled data (13 bins from 320ms to 560ms)
+    y = yBinned(:, (timeIntervals)/binSize, :); % (100, 13, 8)
+    bins = repelem(binSize:binSize:endTime, numNeuronsNew); % (1x2660) 2660 = numNeuronsNew * bins
+    
+    for angle = 1 : numDirections
+        xDirection = squeeze(x(:, :, angle)); % (100, 13)
+        yDirection = squeeze(y(:, :, angle));
+
+        for bin = 1: ((endTime-startTime)/binSize) + 1 % 1, 2, 3... 13 (320ms start)
+            % mean removal for PCR
+            xPCR = xDirection(:, bin) - mean(xDirection(:, bin)); % (100, 1)
+            yPCR = yDirection(:, bin) - mean(yDirection(:, bin));
+            
+        % 4.2 PCA
+            % select the firing data that corresponds to the iteratively increasing intervals and the given angle
+            firingWindowed = firingData(bins <= timeIntervals(bin), labels == angle); % firing data for current interval, selected angle
+            [eigenvectors, eigenvalues] = calcPCA(firingWindowed);
+
+            % use variance explained to select how many components from PCA
+            explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
+            cumExplained = cumsum(explained);
+            dimPCA = find(cumExplained >= pcaThreshold, 1, 'first'); % threshold for selecting components is 80% variance
+            eigenvectors = eigenvectors(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
+            pcaProjection = firingWindowed * eigenvectors;
+            pcaProjection = pcaProjection./sqrt(sum(pcaProjection.^2)); % normalisation
+
+            % project windowed data onto the selected components 
+            projection = pcaProjection' * (firingWindowed - mean(firingWindowed, 1)); % e.g. (dimPCAx2660) * (2660x100) = (dimPCAx100)
+
+            % calculate regression coefficients
+            xCoeff = (pcaProjection * inv(projection*projection') * projection) * xPCR; % (2660xdimPCA * (dimPCA x dimPCA) * (dimPCAx100)) * (100x1)
+            yCoeff = (pcaProjection * inv(projection*projection') * projection) * yPCR; % = (2660x1)
+
+            % record model parameters
+            modelParameters.pcr(angle, bin).xM = xCoeff;
+            modelParameters.pcr(angle, bin).yM = yCoeff;
+            modelParameters.pcr(angle, bin).fMean = mean(firingWindowed, 1);
+            modelParameters.averages(bin).xMean = squeeze(mean(xPadded, 1));
+            modelParameters.averages(bin).yMean = squeeze(mean(yPadded, 1));
+        end
+
+    end % end of PCR
+
+
 
 
 
@@ -209,7 +274,6 @@ function [angleMeans] = gloriaTraining(trainingData)
         
         % Output processing
         eigenvalues = diag(eigenvalues); % only take the non-zero diagonal components, last one is largest
-        eigenvectors = eigenvectors./sqrt(sum(eigenvectors.^2)); % normalisation
     
     end % end of calcPCA function
 
@@ -223,10 +287,10 @@ function [angleMeans] = gloriaTraining(trainingData)
         %   binSize = binning resolution of the spiking/rate data
 
         % Return Value:
-        %   xn
-        %   yn
-        %   x
-        %   y   
+        %   xn: padded x position data
+        %   yn: padded y position data
+        %   x: binned x position data
+        %   y: binned y position data   
     %----------------------------------------------------------------------
 
         % Find the maximum trajectory

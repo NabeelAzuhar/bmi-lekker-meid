@@ -164,7 +164,7 @@ function [modelParameters] = trainingTest(trainingData)
             explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
             cumExplained = cumsum(explained);
             dimPCA = find(cumExplained >= 0.8, 1, 'first'); % threshold for selecting components is 80% variance
-            components = components(:, end-(dimPCA):end); % components are in the order of ascending order so select from end
+            components = components(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
 
             % project windowed data onto the selected components 
             projection = components' * (firingWindowed - mean(firingWindowed, 1));

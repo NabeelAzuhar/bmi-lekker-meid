@@ -28,15 +28,15 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
     % Determine label
     if timeTotal <= 560 % if total time is within the preset time bins
     
-        dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
+        dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         binCount = (timeTotal/binSize) - (timeStart/binSize) + 1; % bin indices to iterate through
-        numNeurons = numNeurons - length(modelParameters.lowFirers{1}); % updates neuron number
+        numNeurons = numNeurons - length(modelParameters.lowFirers); % updates neuron number
 
         % get classification weights from the model parameters for KNN
         optimWeights = modelParameters.classify(binCount).wOpt_kNN;
         meanFiringRates = modelParameters.classify(binCount).mFire_kNN; % mean firing rate
-        WTest = optimWeights' * (firingData - meanFiringRates); % LDA components
+        WTest = optimWeights' * (firingData - meanFiringRates); % test data projecgted onto LDA components
         WTrain = modelParameters.classify(binCount).wLDA_kNN; % weights for LDA
 
         % compute label using KNN
@@ -47,7 +47,7 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         end
     
     else % i.e. just keep using the parameters derived with the largest length of training time
-        dataProcessed.rates(modelParameters.lowFirers{1}, :) = []; % drop neuron data with low firing rates
+        dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
         firingData = reshape(dataProcessed.rates, [], 1); % reshape firing rate data into one column
         label = modelParameters.actualLabel;
      

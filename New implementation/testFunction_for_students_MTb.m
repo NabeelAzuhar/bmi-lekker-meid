@@ -31,7 +31,7 @@ grid
 
 % Train Model
 tic
-[modelParams]= trainingTest(trainingData);
+[modelParams]= gloriaTraining(trainingData);
 
 
 for trialIdx = 1:size(testData, 1)
