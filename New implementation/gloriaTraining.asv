@@ -1,5 +1,5 @@
-function [modelParameters] = gloriaTraining(trainingData)
-    
+function [modelParameters] = gloriaTraining2(trainingData)
+
 %--------------------------------------------------------------------------
     % Arguments:
     
@@ -8,8 +8,6 @@ function [modelParameters] = gloriaTraining(trainingData)
     %     training_data(n,k).trialId      unique number of the trial
     %     training_data(n,k).spikes(i,t)  (i = neuron id, t = time)
     %     training_data(n,k).handPos(d,t) (d = dimension [1-3], t = time)
-    
-    % ... train your model
     
     % Return Value:
     
@@ -50,23 +48,59 @@ function [modelParameters] = gloriaTraining(trainingData)
     % Out: dataProcessed: binned (20ms) & smoothed spikes data, with .rates attribute & binned x, y handPos as .handPos
 
 
-% 2. Generate firing data matrix
-    % 2.1 Fetch firing rate data and create matrix
+% 2. Generate firing data matrix + handPos data matrix
+    % initialisations
+    firingData = zeros(numNeurons*endTime/binSize, numDirections*numTrials); % firing data (binned, truncated to 28 bins)
+    handPosData = zeros(2*endTime/binSize, numTrials*numDirections); % handPos data (binned, truncated to 28 bins)
+    xPadded = zeros(numTrials, maxTimeSteps, numDirections); % original handPos data (in ms) but padded with the longest trajectory
+    yPadded = zeros(numTrials, maxTimeSteps, numDirections);
+    
+    % 2.1 Generate firing and hand position data matrices
     for angle = 1 : numDirections % each angle
         for trial = 1 : numTrials % each trial
+            % generate padded hand position data
+            xPadded(trial, :, angle) = [trainingData(trial,angle).handPos(1,:), trainingData(trial,angle).handPos(1, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))];
+            yPadded(trial, :, angle) = [trainingData(trial,angle).handPos(2,:), trainingData(trial,angle).handPos(2, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))]; 
+
             for bin = 1 : endTime/binSize % each time bin -> taking 28 time bins based on 560ms total time
-                firingData(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).rates(:, bin);     
+                % generate firing data
+                firingData(numNeurons*(bin-1)+1 : numNeurons*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).rates(:, bin);   
+                % generate handPos data
+                handPosData(2*(bin-1)+1 : 2*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).handPos(:, bin);  
             end
         end
     end
-    % Out: firingData (98*28, 8*100): rows = 98 neurons * 28 bins, columns = 8 angles * 100 trials
+    % Out: firingData (98*28 x 8*100): rows = 98 neurons * 28 bins, columns = 8 angles * 100 trials
+    %      handPosData = (28*2 x 8*100) - binned averaged handPos
+    %      xPadded (or yPadded) = (100 x 792 x 8) - originial handPos data in ms padded with the last value to the longest trajectory length
+
+    % 2.2 Mark the neurons to be removed based on firing rate (with rate threshold at 0.5)
+    lowFiringNeurons = []; % list to store the indices of low-firing neurons
+    for neuron = 1 : numNeurons
+        avgRate = mean(mean(firingData(neuron:98:end, :)));
+        if avgRate < 0.5 % remove neurons with average rate less than 0.5
+            lowFiringNeurons = [lowFiringNeurons, neuron];
+        end
+    end
+    % Out: lowFiringNeurons: a list containing all the low-firing neurons
+
+    % 2.3 Remove the neurons
+    removedRows = []; % rows of data to remove (for low firing neurons at all its time bins)
+    for lowFirer = lowFiringNeurons
+        removedRows = [removedRows, lowFirer:numNeurons:length(firingData)];
+    end
+    firingData(removedRows, :) = []; % remove the rows for the low firers
+    numNeurons = numNeurons - length(lowFiringNeurons); % update number of neurons after removing the low firers
+    modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to remove the same ones in test data
+    % Out:
+    %   firingData: filtered rows after neuron removal (removes row corresponding to low firing neurons)
 
 
-% 3. Extract parameters for classification
-    % Start with data from 320ms, then iteratively add 20ms until 560ms for training
+% 3. Training to extract parameters
     binIndices = (startTime:binSize:endTime) / binSize; % 16 : 28
     intervalIdx = 1;
 
+    % Start with data from 320ms (16th bin), then iteratively add 20ms (1 bin) until 560ms (28th bin) for training
     for interval = binIndices % iteratively add testing time: 16, 17, 18, ... 28
 
     % 3.1 get firing rate data up to the certain time bin
@@ -84,7 +118,7 @@ function [modelParameters] = gloriaTraining(trainingData)
 
         % Use variance explained to select how many components from PCA
         explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
-        pcaThreshold = 0.7;
+        pcaThreshold = 0.7; % threshold for selecting PCa components
         cumExplained = cumsum(explained);
         dimPCA = find(cumExplained >= pcaThreshold, 1, 'first');
         eigenvectors = eigenvectors(:, end-(dimPCA)+1:end); % components are in the order of ascending order so select from end
@@ -95,7 +129,7 @@ function [modelParameters] = gloriaTraining(trainingData)
         pcaProjection = pcaProjection./sqrt(sum(pcaProjection.^2)); % normalisation
     % Out: pcaProjection: projected firingCurrent data, reduced along the angle-trial axis, normalised
     
-    % 3.3 Linear Discriminant Analysis
+    % 4.3 Linear Discriminant Analysis
         dimLDA = 6;
         overallMean = mean(firingCurrent, 2); % (2660 x 1), mean rate for each neuron-bin
 
@@ -113,7 +147,7 @@ function [modelParameters] = gloriaTraining(trainingData)
         % Compute eigen analysis to find directions maximising the S_B/S_W ratio
         % pcaProjection = weights we try to optimise to maximise the Fisher Criteron
         % The vector w that maximizes J(w) is used as the direction along which the data is projected to achieve the best class separability
-        fisherCriterion = ((pcaProjection' * S_W * pcaProjection)^-1) * (pcaProjection' * S_B * pcaProjection); % (dimPCA x dimPCA)
+        fisherCriterion = inv(pcaProjection' * S_W * pcaProjection) * (pcaProjection' * S_B * pcaProjection); % (dimPCA x dimPCA)
         [eigenvectors, eigenvalues] = eig(fisherCriterion);
         [~, sortIdx] = sort(diag(eigenvalues), 'descend');
         testProjection = pcaProjection * eigenvectors(:, sortIdx(1:dimLDA)); % LDA projection components for testing data (2660 x 6)
@@ -125,58 +159,28 @@ function [modelParameters] = gloriaTraining(trainingData)
         modelParameters.knnClassify(intervalIdx).dimPCA = dimPCA;
         modelParameters.knnClassify(intervalIdx).dimLDA = dimLDA;
         modelParameters.knnClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
-        intervalIdx = intervalIdx + 1;
 
-    end % end of current interval
+    % 4.4 Principal Component Regression
+        for angle = 1: numDirections % generate coefficients for each angle
+            % select data for the specified angle
+            xPos = handPosData((startTime/binSize * 2 - 1):2:end, labels==angle); % select the x pos for the selected angle (28x100), starting from 13th bin
+            yPos = handPosData((startTime/binSize * 2):2:end, labels==angle); % (13 x 100), 13 bins from 320ms to 560ms (1, 2, 3... 13)
 
+            % select data for the current time bin
+            xCurrent = xPos(intervalIdx, :) - mean(xPos(intervalIdx, :)); % (1x100), mean removed
+            yCurrent = yPos(intervalIdx, :) - mean(yPos(intervalIdx, :));
 
-% 4. Principal Component Regression
-    % we're edging so hard right now
-    timeIntervals = startTime : binSize : endTime; % 320 : 20 : 560
-    bins = repelem(binSize:binSize:endTime, numNeurons); % time steps corresponding to the 28 bins replicated for 95 neurons
-  
-    % 4.1 Get the relevent position data
-    handPosData = zeros(2*endTime/binSize, numTrials*numDirections);
-    xPadded = zeros(numTrials, maxTimeSteps, numDirections);
-    yPadded = zeros(numTrials, maxTimeSteps, numDirections);
-
-    for angle = 1 : numDirections
-        for trial = 1 : numTrials
-            xPadded(trial, :, angle) = [trainingData(trial,angle).handPos(1,:), trainingData(trial,angle).handPos(1, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))];
-            yPadded(trial, :, angle) = [trainingData(trial,angle).handPos(2,:), trainingData(trial,angle).handPos(2, end) * ones(1, maxTimeSteps - timeSteps(numTrials*(angle-1) + trial))]; 
-            % padded data = 100 x 792 x 8 - padded with the last value
-            
-            % get average hand position data
-            for bin = 1 : endTime/binSize  % 1 : 28
-                handPosData(2*(bin-1)+1 : 2*bin, numTrials*(angle-1)+trial) = dataProcessed(trial, angle).handPos(:, bin);     
-            end
-            % handPosData = (28*2, 8*100)
-        end
-    end
-    
-    % 4.2 Compoute PCR coefficients
-    for angle = 1: numDirections
-        % select data for the specified angle
-        xPos = handPosData((startTime/binSize * 2 - 1):2:end, labels==angle); % select the x pos for the selected angle (28x100), starting from 13th bin
-        yPos = handPosData((startTime/binSize * 2):2:end, labels==angle); % (13 x 100), 13 bins from 320ms to 560ms
-
-        for bin = 1: ((endTime-startTime)/binSize) + 1 % 1, 2, 3... 13 (320ms start)
-            % select the hand position data at current bin, remove mean
-            xCurrent = xPos(bin, :) - mean(xPos(bin, :)); % (1x100), mean removed
-            yCurrent = yPos(bin, :) - mean(yPos(bin, :));
-
-        % 4.1 PCA
-            % select the firing data that corresponds to the iteratively increasing intervals and the given angle
-            firingWindowed = firingData(bins <= timeIntervals(bin), labels == angle); % firing data for current interval, selected angle e.g. (2660x100)
+            % select the firing data that corresponds to the current interval AND the given angle
+            firingWindowed = firingCurrent(:, labels == angle); % firing data for current interval, selected angle e.g. (2660x100)
             [eigenvectors, eigenvalues] = calcPCA(firingWindowed);
 
             % use variance explained to select how many components from PCA
             explained = sort(eigenvalues/sum(eigenvalues), 'descend'); % sort in descending order, variance explained
             cumExplained = cumsum(explained);
-            dimPCA = find(cumExplained >= pcaThreshold, 1, 'first'); % threshold for selecting components is 80% variance
+            dimPCA = find(cumExplained >= pcaThreshold, 1, 'first');
             eigenvectors = eigenvectors(:, end-(dimPCA)+1:end); % (100 x dimPCA)
             pcaProjection = firingWindowed * eigenvectors; % (2660x100) * (100xdimPCA) = (2660xdimPCA)
-
+            
             % project windowed data onto the selected components 
             projection = pcaProjection' * (firingWindowed - mean(firingWindowed, 1)); % e.g. (dimPCAx2660) * (2660x100) = (dimPCAx100)
     
@@ -185,13 +189,18 @@ function [modelParameters] = gloriaTraining(trainingData)
             yCoeff = (pcaProjection * inv(projection*projection') * projection) * yCurrent'; % = (2660x1)
     
             % record model parameters
-            modelParameters.regression(angle, bin).xCoeff = xCoeff;
-            modelParameters.regression(angle, bin).yCoeff = yCoeff;
-            modelParameters.regression(angle, bin).firingMean = mean(firingWindowed, 1); % (1x800)
-            modelParameters.positionMeans(bin).xMean = squeeze(mean(xPadded, 1)); % squeeze(mean(xPadded, 1)) = (792ms x 8), mean across 100 trials for each angle
-            modelParameters.positionMeans(bin).yMean = squeeze(mean(yPadded, 1));
-        end
-    end % end of PCR
+            modelParameters.regression(angle, intervalIdx).xCoeff = xCoeff;
+            modelParameters.regression(angle, intervalIdx).yCoeff = yCoeff;
+            modelParameters.regression(angle, intervalIdx).firingMean = mean(firingWindowed, 1); % (1x800)
+            modelParameters.positionMeans(intervalIdx).xMean = squeeze(mean(xPadded, 1)); % squeeze(mean(xPadded, 1)) = (792ms x 8), mean across 100 trials for each angle
+            modelParameters.positionMeans(intervalIdx).yMean = squeeze(mean(yPadded, 1));
+
+        end % end of PCR
+
+        intervalIdx = intervalIdx + 1; % record the current bin index (13th bin is the 1st)
+
+    end % end of current interval
+
 
 
 % Nested functions --------------------------------------------------------

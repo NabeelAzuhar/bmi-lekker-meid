@@ -9,7 +9,7 @@ close all
 load("monkeydata_training.mat")
 
 % Set random number generator seed
-% rng(1500);
+% rng(2013);
 
 % Shuffle trial order
 ix = randperm(length(trial));
@@ -31,7 +31,7 @@ grid
 
 % Train Model
 tic
-[modelParams]= gloriaTraining(trainingData);
+[modelParams]= gloriaTraining2(trainingData);
 
 for trialIdx = 1:size(testData, 1)
     fprintf('Decoding block %d out of %d\n', trialIdx, size(testData, 1));
