@@ -1,11 +1,11 @@
 % Last edit: 19/03/22
 % Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
 
-function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
+function [x, y, modelParameters]= positionEstimator(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:
-        % testData: 1 struct with very similar formatting to trial, other than it has the additinal field of starting position
+        % testData: 1 trial with the additinal field of starting position
         % modelParameters: previously saved modelParameters from PCA-LDA analysis using the training dataset
     
     % Outputs:
@@ -14,13 +14,13 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
         % modelParameters: updated parameters
     %----------------------------------------------------------------------
             
-    % Initialisations
+% Initialisations
     binSize = modelParameters.binSize; % binning resolution (ms)
     window = modelParameters.window; % window length (ms)
     startTime = 320; % start time of testing (ms)
     endTime = modelParameters.endTime; % minimum time length in training data
 
-% 1. Data pre-processing
+% 1. Data Pre-processing
     dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed - 1 single struct
     dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
@@ -201,4 +201,4 @@ function [x, y, modelParameters]= estimatorTest(testData, modelParameters)
 
 % Nested functions --------------------------------------------------------
 
-end
+end % end of positionEstim
