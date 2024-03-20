@@ -15,8 +15,8 @@ ix = randperm(length(trial));
 % addpath(teamName);
 
 % Select training and testing data (you can choose to split your data in a different way if you wish)
-trainingData = trial(ix(1:60),:);
-testData = trial(ix(61:end),:);
+trainingData = trial(ix(1:50),:);
+testData = trial(ix(51:end),:);
 
 fprintf('Testing the continuous position estimator...')
 
@@ -29,6 +29,7 @@ axis square
 grid
 
 % Train Model
+tic
 modelParameters = positionEstimatorTraining(trainingData);
 
 for tr=1:size(testData,1)
@@ -69,6 +70,8 @@ end
 legend('Decoded Position', 'Actual Position')
 
 RMSE = sqrt(meanSqError/n_predictions) 
+
+toc
 
 % rmpath(genpath(teamName))
 

@@ -22,7 +22,7 @@ function [x, y, modelParameters]= positionEstimator(testData, modelParameters)
 
 % 1. Data Pre-processing
     dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed - 1 single struct
-    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
+    % dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
     binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
     

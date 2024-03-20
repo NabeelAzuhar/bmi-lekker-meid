@@ -22,7 +22,7 @@ function [x, y, modelParameters]= positionEstimator(testData, modelParameters)
 
 % 1. Data Pre-processing
     dataProcessed = dataProcessor(testData, binSize, window); % binned, squarerooted, smoothed - 1 single struct
-    dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
+    % dataProcessed.rates(modelParameters.lowFirers, :) = []; % drop neuron data with low firing rates
     timeTotal = size(testData.spikes, 2); % total (ending) time of the trial given in ms
     binCount = (timeTotal/binSize) - (startTime/binSize) + 1; % bin indices to indicate which classification parameters to use
     
@@ -34,15 +34,21 @@ function [x, y, modelParameters]= positionEstimator(testData, modelParameters)
 % 2. Determine label by KNN classification
     if timeTotal <= endTime % if total time is within the preset training time bins
  
-        % get classification weights from the model parameters for KNN for the corresponding bin interval
-        testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
-        firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
-        testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
-        trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
+        if timeTotal <= 320
 
-        % compute label using KNN
-        label = calcKnns(testLDA, trainLDA); % label = predicted direciton using knn
-        modelParameters.actualLabel = label;
+            % get classification weights from the model parameters for KNN for the corresponding bin interval
+            testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
+            firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+            testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+            trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
+    
+            % compute label using KNN
+            label = calcKnns(testLDA, trainLDA); % label = predicted direciton using knn
+            modelParameters.actualLabel = label;
+
+        else
+            label = modelParameters.actualLabel;
+        end
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
         label = modelParameters.actualLabel;

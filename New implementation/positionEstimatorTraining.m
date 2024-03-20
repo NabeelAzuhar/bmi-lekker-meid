@@ -74,26 +74,26 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
     %      handPosData = (28*2 x 8*100) - binned averaged handPos
     %      xPadded (or yPadded) = (100 x 792 x 8) - originial handPos data in ms padded with the last value to the longest trajectory length
 
-    % 2.2 Mark the neurons to be removed based on firing rate (with rate threshold at 0.5)
-    lowFiringNeurons = []; % list to store the indices of low-firing neurons
-    for neuron = 1 : numNeurons
-        avgRate = mean(mean(firingData(neuron:98:end, :)));
-        if avgRate < 0.5 % remove neurons with average rate less than 0.5
-            lowFiringNeurons = [lowFiringNeurons, neuron];
-        end
-    end
-    % Out: lowFiringNeurons: a list containing all the low-firing neurons
-
-    % 2.3 Remove the neurons
-    removedRows = []; % rows of data to remove (for low firing neurons at all its time bins)
-    for lowFirer = lowFiringNeurons
-        removedRows = [removedRows, lowFirer:numNeurons:length(firingData)];
-    end
-    firingData(removedRows, :) = []; % remove the rows for the low firers
-    numNeurons = numNeurons - length(lowFiringNeurons); % update number of neurons after removing the low firers
-    modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to remove the same ones in test data
-    % Out:
-    %   firingData: filtered rows after neuron removal (removes row corresponding to low firing neurons)
+    % % 2.2 Mark the neurons to be removed based on firing rate (with rate threshold at 0.5)
+    % lowFiringNeurons = []; % list to store the indices of low-firing neurons
+    % for neuron = 1 : numNeurons
+    %     avgRate = mean(mean(firingData(neuron:98:end, :)));
+    %     if avgRate < 0.5 % remove neurons with average rate less than 0.5
+    %         lowFiringNeurons = [lowFiringNeurons, neuron];
+    %     end
+    % end
+    % % Out: lowFiringNeurons: a list containing all the low-firing neurons
+    % 
+    % % 2.3 Remove the neurons
+    % removedRows = []; % rows of data to remove (for low firing neurons at all its time bins)
+    % for lowFirer = lowFiringNeurons
+    %     removedRows = [removedRows, lowFirer:numNeurons:length(firingData)];
+    % end
+    % firingData(removedRows, :) = []; % remove the rows for the low firers
+    % numNeurons = numNeurons - length(lowFiringNeurons); % update number of neurons after removing the low firers
+    % modelParameters.lowFirers = lowFiringNeurons; % record low firing neurons to remove the same ones in test data
+    % % Out:
+    % %   firingData: filtered rows after neuron removal (removes row corresponding to low firing neurons)
 
 
 % 3. Training to extract parameters
