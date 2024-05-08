@@ -65,11 +65,12 @@ function [modelParameters] = estimatorTraining(trainingData)
         
         % get firing rate data up to the certain time bin
         firingCurrent = firingData(:, 1:numNeurons*interval);
-        overallMean = mean(firingCurrent, 2); % (1 x 2660), mean rate for each neuron-bin
+        overallMean = mean(firingCurrent, 1); % (1 x 2660), mean rate for each neuron-bin
+%         disp(size(overallMean))
 
         %%% Classification %%%
         [trainProjected, transformation, dimPCA, dimLDA] = pcaLda(firingCurrent, labels);
-        
+
         % Add to ModelParameters
         modelParameters.knnClassify(intervalIdx).trainProjected = trainProjected;
         modelParameters.knnClassify(intervalIdx).transformation = transformation;
@@ -88,14 +89,17 @@ function [modelParameters] = estimatorTraining(trainingData)
             firingWindowed = firingCurrent(labels == angle, :); % firing data for current interval, selected angle e.g. (100x2660)
 
             % Regression
-            [xCoeff, yCoeff] = pcrLinear(firingWindowed, xPos, yPos, intervalIdx);
+            [mdlx, mdly, meanx, meany, pcaTransformation] = pcrLinear(firingWindowed, xPos, yPos, intervalIdx);
             
             % record model parameters
-            modelParameters.regression(angle, intervalIdx).xCoeff = xCoeff;
-            modelParameters.regression(angle, intervalIdx).yCoeff = yCoeff;
-            modelParameters.regression(angle, intervalIdx).firingMean = mean(firingWindowed, 1); % (1 x 2660)
-            modelParameters.positionMeans(intervalIdx).xMean = squeeze(mean(xPadded, 1)); % squeeze(mean(xPadded, 1)) = (792ms x 8), mean across 100 trials for each angle
-            modelParameters.positionMeans(intervalIdx).yMean = squeeze(mean(yPadded, 1));  
+            modelParameters.regression(angle, intervalIdx).mdlx = mdlx;
+            modelParameters.regression(angle, intervalIdx).mdly = mdly;
+            modelParameters.regression(angle, intervalIdx).meanx = meanx;
+            modelParameters.regression(angle, intervalIdx).meany = meany;
+            modelParameters.regression(angle, intervalIdx).pcaTransformation = pcaTransformation; % (2660 x 49)
+%             modelParameters.regression(angle, intervalIdx).firingMean = mean(firingWindowed, 1); % (1 x 2660)
+%             modelParameters.positionMeans(intervalIdx).xMean = squeeze(mean(xPadded, 1)); % squeeze(mean(xPadded, 1)) = (975 x 8), mean across 100 trials for each angle
+%             modelParameters.positionMeans(intervalIdx).yMean = squeeze(mean(yPadded, 1));   % (975 x 8)
         end
         %%%
 
@@ -213,7 +217,7 @@ function [modelParameters] = estimatorTraining(trainingData)
     end
     
     
-    function [xCoeff, yCoeff] = pcrLinear(X, xPos, yPos, intervalIdx)
+    function [mdlx, mdly, meanx, meany, pcaTransformation] = pcrLinear(X, xPos, yPos, intervalIdx)
         % select data for the current time bin (e.g. 13, 14 ... 28)
             xCurrent = xPos(:, intervalIdx) - mean(xPos(:, intervalIdx)); % (100x1), mean removed
             yCurrent = yPos(:, intervalIdx) - mean(yPos(:, intervalIdx)); % (100x1), mean removed
@@ -224,9 +228,12 @@ function [modelParameters] = estimatorTraining(trainingData)
             pcaThreshold = 70;
             dimPCA = find(cumulative_explained >= pcaThreshold, 1);
             X_pca = X * coeff(:, 1:dimPCA);
-    
-            xCoeff = regress(xCurrent, [ones(size(X_pca, 1), 1), X_pca]); % (49 * 1)
-            yCoeff = regress(yCurrent, [ones(size(X_pca, 1), 1), X_pca]); % (49 * 1)
-            disp(size(xCoeff))
+            pcaTransformation = coeff(:, 1:dimPCA);
+        
+        % Linear regression
+            mdlx = fitlm(X_pca, xCurrent);
+            mdly = fitlm(X_pca, yCurrent);
+            meanx = mean(xPos(:, intervalIdx));
+            meany = mean(yPos(:, intervalIdx));
     end
 end
