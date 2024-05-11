@@ -33,21 +33,12 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
 
 % 2. Determine label by classification
     if timeTotal <= endTime % if total time is within the preset training time bins
- 
-        % get classification weights from the model parameters for KNN for the corresponding bin interval
-        testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
-        firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
-        testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
-        trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
-        ecoc_model = modelParameters.knnClassify(binCount).ecoc_model;
 
-%         % compute label using KNN
-%         label = calcKnns(testLDA, trainLDA); % label = predicted direciton using knn
-%         modelParameters.actualLabel = label;
-
-        % compute label using Linear SVM
-        label = calcLinearSVM(testLDA, ecoc_model); % label = predicted direciton using linear svm
+        %%% Classify %%%
+        % Classification = 'KNN', 'LinearSVM'
+        [label, firingMean] = classify('LinearSVM', modelParameters);
         modelParameters.actualLabel = label;
+        %%%
 
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
@@ -167,7 +158,7 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     end % end of function dataProcessor
 
 
-    function [labels] = calcKnns(testingData, trainingData)
+    function [labels, firingMean] = calcKnns(modelParameters)
     %----------------------------------------------------------------------
     % calcKnns Predicts labels using k-nearest neighbors algorithm.
     %   
@@ -179,9 +170,14 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     %       labels: Reaching angle/direction labels of the testing data deduced with the k-nearest neighbors algorithm      
     %----------------------------------------------------------------------
 
+    testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
+    firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+    testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+    trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
+    
     % Reformatting the train and test data
-    trainMat = trainingData'; % training data projected onto LDA
-    testMat = testingData; % testing data projected onto LDA
+    trainMat = trainLDA'; % training data projected onto LDA
+    testMat = testLDA; % testing data projected onto LDA
     trainSquaredSum = sum(trainMat .* trainMat, 2);
     testSquaredSum = sum(testMat .* testMat, 1);
 
@@ -196,7 +192,7 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     nearest = sorted(:, 1: k);
 
     % Determine the direction for the k-nearest neighbors
-    numTrain = size(trainingData, 2) / 8;
+    numTrain = size(trainLDA, 2) / 8;
     dirLabels = [ones(1, numTrain), 2 * ones(1, numTrain), ...
                   3 * ones(1, numTrain), 4 * ones(1, numTrain), ...
                   5 * ones(1, numTrain), 6 * ones(1, numTrain), ...
@@ -207,7 +203,7 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     end % end of KNN function
 
 
-    function [labels] = calcLinearSVM(testingData, ecoc_model)
+    function [labels, firingMean] = calcLinearSVM(modelParameters)
     %----------------------------------------------------------------------
     % calcKnns Predicts labels using k-nearest neighbors algorithm.
     %   
@@ -218,10 +214,22 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     %   Returns:
     %       labels: Reaching angle/direction labels of the testing data deduced with linear SVM      
     %----------------------------------------------------------------------
-    testMat = testingData'; % testing data projected onto LDA
-
-    % Step 3: Make predictions on the test data
+    testProjection = modelParameters.LinearSVMClassify(binCount).testProjection; % (2660 x 6)
+    firingMean = modelParameters.LinearSVMClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+    testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+    trainLDA = modelParameters.LinearSVMClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
+    ecoc_model = modelParameters.LinearSVMClassify(binCount).ecoc_model;
+    testMat = testLDA'; % testing data projected onto LDA
+    % Predict labels
     labels = predict(ecoc_model, testMat);
+    end
+
+    function [labels, firingMean] = classify(classification, modelParameters)
+        if strcmp(classification, 'KNN')
+            [labels, firingMean] = calcKnns(modelParameters);
+        elseif strcmp(classification, 'LinearSVM')
+            [labels, firingMean] = calcLinearSVM(modelParameters);
+        end
     end
 
 % Nested functions --------------------------------------------------------

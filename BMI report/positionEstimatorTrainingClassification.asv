@@ -154,8 +154,11 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         trainProjected = testProjection' * (firingCurrent - overallMean); % training data projected onto LDA (6x2660) * (2660x800) = (6 x 800)
 
         %%% CLASSIFICATIONS %%%
-        % Classification = 'KNN', 'LinearSVM'
-        [modelParameters] = train_classification('LinearSVM', modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
+        % Linear SVM
+%         [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
+
+        % KNN
+        [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
         %%%
         disp(modelParameters)
 
@@ -318,12 +321,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         modelParameters.LinearSVMClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
     end
 
-    function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean)
-        if strcmp(classification, 'KNN')
-            [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
-        elseif strcmp(classification, 'LinearSVM')
-            [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
-        end
+    function train_classification(classification)
+        if classification = 'KNN'
+
+        elseif classification = 'LinearSVM'
     end
 
 % Nested functions --------------------------------------------------------
