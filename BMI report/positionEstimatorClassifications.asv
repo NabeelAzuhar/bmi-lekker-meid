@@ -33,27 +33,12 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
 
 % 2. Determine label by classification
     if timeTotal <= endTime % if total time is within the preset training time bins
- 
-%         % get classification weights from the model parameters for KNN for the corresponding bin interval
-%         testProjection = modelParameters.knnClassify(binCount).testProjection; % (2660 x 6)
-%         firingMean = modelParameters.knnClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
-%         testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
-%         trainLDA = modelParameters.knnClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
-%         ecoc_model = modelParameters.knnClassify(binCount).ecoc_model;
 
         %%% Classify %%%
-
+        % Classification = 'KNN', 'LinearSVM'
+        [label, firingMean] = classify('LinearSVM', modelParameters);
         modelParameters.actualLabel = label;
         %%%
-
-          % compute label using KNN
-        [label, firingMean] = calcKnns(modelParameters);
-%         label = calcKnns(testLDA, trainLDA); % label = predicted direciton using knn
-        modelParameters.actualLabel = label;
-
-%         % compute label using Linear SVM
-%         [label, firingMean] = calcLinearSVM(modelParameters); % label = predicted direciton using linear svm
-%         modelParameters.actualLabel = label;
 
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
@@ -239,10 +224,11 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     labels = predict(ecoc_model, testMat);
     end
 
-    function [labels, firingMean] = calcLinearSVM(classification, modelParameters)
-        if classification == 'KNN'
-
-        else if classification == 'LinearSVM'
+    
+    function [labels, firingMean] = classify(classification, modelParameters)
+        if strcmp(classification, 'KNN')
+            [labels, firingMean] = calcKnns(modelParameters);
+        elseif strcmp(classification, 'LinearSVM')
             [labels, firingMean] = calcLinearSVM(modelParameters);
         end
     end

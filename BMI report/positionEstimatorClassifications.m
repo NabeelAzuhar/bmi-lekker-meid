@@ -35,8 +35,8 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     if timeTotal <= endTime % if total time is within the preset training time bins
 
         %%% Classify %%%
-        % Classification = 'KNN', 'LinearSVM'
-        [label, firingMean] = classify('LinearSVM', modelParameters);
+        % Classification = 'KNN', 'LinearSVM', 'KernelSVM'
+        [label, firingMean] = classify('KernelSVM', modelParameters);
         modelParameters.actualLabel = label;
         %%%
 
@@ -217,18 +217,41 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     testProjection = modelParameters.LinearSVMClassify(binCount).testProjection; % (2660 x 6)
     firingMean = modelParameters.LinearSVMClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
     testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
-    trainLDA = modelParameters.LinearSVMClassify(binCount).trainProjected; % (6 x 800), train data projected onto LDA components
     ecoc_model = modelParameters.LinearSVMClassify(binCount).ecoc_model;
     testMat = testLDA'; % testing data projected onto LDA
     % Predict labels
     labels = predict(ecoc_model, testMat);
     end
 
+
+    function [labels, firingMean] = calcKernelSVM(modelParameters)
+    %----------------------------------------------------------------------
+    % calcKnns Predicts labels using k-nearest neighbors algorithm.
+    %   
+    %   Arguments:
+    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data onto LDA components               
+    %       ecoc_model: Pretrained Linear SVM model  
+    %
+    %   Returns:
+    %       labels: Reaching angle/direction labels of the testing data deduced with linear SVM      
+    %----------------------------------------------------------------------
+    testProjection = modelParameters.KernelSVMClassify(binCount).testProjection; % (2660 x 6)
+    firingMean = modelParameters.KernelSVMClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+    testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+    ecoc_model = modelParameters.KernelSVMClassify(binCount).ecoc_model;
+    testMat = testLDA'; % testing data projected onto LDA
+    % Predict labels
+    labels = predict(ecoc_model, testMat);
+    end
+
+    
     function [labels, firingMean] = classify(classification, modelParameters)
         if strcmp(classification, 'KNN')
             [labels, firingMean] = calcKnns(modelParameters);
         elseif strcmp(classification, 'LinearSVM')
             [labels, firingMean] = calcLinearSVM(modelParameters);
+        elseif strcmp(classification, 'KernelSVM')
+            [labels, firingMean] = calcKernelSVM(modelParameters);
         end
     end
 

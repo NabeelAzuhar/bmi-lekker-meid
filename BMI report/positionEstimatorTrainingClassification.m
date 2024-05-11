@@ -154,8 +154,8 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         trainProjected = testProjection' * (firingCurrent - overallMean); % training data projected onto LDA (6x2660) * (2660x800) = (6 x 800)
 
         %%% CLASSIFICATIONS %%%
-        % Classification = 'KNN', 'LinearSVM'
-        [modelParameters] = train_classification('LinearSVM', modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
+        % Classification = 'KNN', 'LinearSVM', 'KernelSVM'
+        [modelParameters] = train_classification('KernelSVM', modelParameters, trainProjected, testProjection, overallMean);
         %%%
         disp(modelParameters)
 
@@ -293,16 +293,14 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end % end of calcPCA function
 
     
-    function [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean)
+    function [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, overallMean)
         % Store all the relevant weights for KNN
         modelParameters.knnClassify(intervalIdx).trainProjected = trainProjected; % (6 x 800) - 800 trials projected onto 6 components
         modelParameters.knnClassify(intervalIdx).testProjection = testProjection; % (2660 x 6)
-        modelParameters.knnClassify(intervalIdx).dimPCA = dimPCA;
-        modelParameters.knnClassify(intervalIdx).dimLDA = dimLDA;
         modelParameters.knnClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
     end
 
-    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean)
+    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
         y_labels = repelem(directions, trial_split)';
@@ -311,18 +309,32 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         
        % Store all the relevant weights for KNN
         modelParameters.LinearSVMClassify(intervalIdx).ecoc_model = ecoc_model;
-        modelParameters.LinearSVMClassify(intervalIdx).trainProjected = trainProjected; % (6 x 800) - 800 trials projected onto 6 components
         modelParameters.LinearSVMClassify(intervalIdx).testProjection = testProjection; % (2660 x 6)
-        modelParameters.LinearSVMClassify(intervalIdx).dimPCA = dimPCA;
-        modelParameters.LinearSVMClassify(intervalIdx).dimLDA = dimLDA;
         modelParameters.LinearSVMClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
     end
 
-    function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean)
+    
+    function [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean)
+        % Linear SVM Classification
+        directions = [1,2,3,4,5,6,7,8];
+        y_labels = repelem(directions, trial_split)';
+        svm_template = templateSVM('KernelFunction', 'rbf','BoxConstraint', 100, 'KernelScale', 100);
+        ecoc_model = fitcecoc(trainProjected', y_labels, 'Learners', svm_template);
+        
+       % Store all the relevant weights for KNN
+        modelParameters.KernelSVMClassify(intervalIdx).ecoc_model = ecoc_model;
+        modelParameters.KernelSVMClassify(intervalIdx).testProjection = testProjection; % (2660 x 6)
+        modelParameters.KernelSVMClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
+    end
+
+
+    function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, overallMean)
         if strcmp(classification, 'KNN')
-            [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
+            [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, overallMean);
         elseif strcmp(classification, 'LinearSVM')
-            [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, dimPCA, dimLDA, overallMean);
+            [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean);
+        elseif strcmp(classification, 'KernelSVM')
+            [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean);
         end
     end
 
