@@ -36,7 +36,7 @@ function [x, y, modelParameters, label]= positionEstimatorClassifications(testDa
 
         %%% Classify %%%
         % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
-        [label, firingMean] = classify('NaiveBayes', modelParameters);
+        [label, firingMean] = classify('KNN', modelParameters);
         modelParameters.actualLabel = label;
         %%%
 

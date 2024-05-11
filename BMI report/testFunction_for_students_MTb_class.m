@@ -68,14 +68,14 @@ for tr=1:size(testData,1)
         end
         n_predictions = n_predictions+length(times);
         hold on
-        plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
-        plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
+%         plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
+%         plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
     end
 end
 
 elapsedTime = toc;
 
-legend('Decoded Position', 'Actual Position')
+% legend('Decoded Position', 'Actual Position')
 
 RMSE = sqrt(meanSqError/n_predictions);
 classificationSuccessRate = 100 - ((sum(actualClassificationLabels ~= classifiedLabels) / size(actualClassificationLabels, 2)) * 100);

@@ -153,9 +153,54 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         testProjection = pcaProjection * eigenvectors(:, sortIdx(1:dimLDA)); % LDA projection components for testing data to project on (2660 x 6)
         trainProjected = testProjection' * (firingCurrent - overallMean); % training data projected onto LDA (6x2660) * (2660x800) = (6 x 800)
 
+        % PCA and LDA plot
+        if interval == 28
+            [coeff, ~, ~, ~, explained] = pca(firingCurrent');
+            cumulative_explained = cumsum(explained);
+            desired_explained_variance = 70; % Set desired explained variance percentage
+            num_components = find(cumulative_explained >= desired_explained_variance, 1);
+            firingCurrent_pca = firingCurrent' * coeff(:, 1:num_components);
+            
+            num_subsets = 8;
+            subset_size = trial_split;
+            
+            % PCA plot
+            fig = figure;
+            subplot(1,2,1);
+            hold on;
+            for i = 1:num_subsets
+                subset_start = (i - 1) * subset_size + 1;
+                subset_end = i * subset_size;
+                plot(firingCurrent_pca(subset_start:subset_end, 1), firingCurrent_pca(subset_start:subset_end, 2), '.', 'MarkerSize', 10);
+            end
+            hold off;
+            xlabel('PCA 1'); 
+            ylabel('PCA 2');
+            title('PCA Plot of Neuronal Activity');
+
+            % LDA plot
+            subplot(1,2,2);
+            hold on;
+            LDAData = trainProjected';
+            for i = 1:num_subsets
+                subset_start = (i - 1) * subset_size + 1;
+                subset_end = i * subset_size;
+                plot(LDAData(subset_start:subset_end, 1), LDAData(subset_start:subset_end, 2), '.', 'MarkerSize', 10);
+            end
+            hold off;
+            xlabel('LDA 1'); 
+            ylabel('LDA 2');
+            title('LDA Plot of Neuronal Activity');
+
+            fig = gcf;
+            fig.Position(4) = fig.Position(4) + 50;
+
+            legend('Angle 1', 'Angle 2', 'Angle 3', 'Angle 4', 'Angle 5', 'Angle 6', 'Angle 7', 'Angle 8', 'Location', 'southoutside', 'Orientation', 'horizontal');
+        end
+
         %%% CLASSIFICATIONS %%%
         % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
-        [modelParameters] = train_classification('NaiveBayes', modelParameters, trainProjected, testProjection, overallMean);
+        [modelParameters] = train_classification('KNN', modelParameters, trainProjected, testProjection, overallMean);
         %%%
         disp(modelParameters)
 
