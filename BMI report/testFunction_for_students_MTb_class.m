@@ -4,7 +4,7 @@
 % the relevant modelParameters, and then calls the function
 % "positionEstimator" to decode the trajectory. 
 
-function RMSE = testFunction_for_students_MTb(teamName)
+function RMSE = testFunction_for_students_MTb_class(teamName)
 
 load monkeydata_training.mat
 
@@ -23,14 +23,17 @@ fprintf('Testing the continuous position estimator...')
 
 meanSqError = 0;
 n_predictions = 0;  
+actualClassificationLabels = [];
+classifiedLabels = [];
 
 figure
 hold on
 axis square
 grid
 
+tic;
 % Train Model
-modelParameters = positionEstimatorTraining(trainingData);
+modelParameters = positionEstimatorTrainingClassification(trainingData, trial_split);
 
 for tr=1:size(testData,1)
     display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);
@@ -41,35 +44,45 @@ for tr=1:size(testData,1)
         times=320:20:size(testData(tr,direc).spikes,2);
         
         for t=times
+            actualClassificationLabels = [actualClassificationLabels, direc];
+
             past_current_trial.trialId = testData(tr,direc).trialId;
             past_current_trial.spikes = testData(tr,direc).spikes(:,1:t); 
             past_current_trial.decodedHandPos = decodedHandPos;
 
             past_current_trial.startHandPos = testData(tr,direc).handPos(1:2,1); 
             
-            if nargout('positionEstimator') == 3
-                [decodedPosX, decodedPosY, newParameters] = positionEstimator(past_current_trial, modelParameters);
+            if nargout('positionEstimatorClassifications') == 4
+                [decodedPosX, decodedPosY, newParameters, label] = positionEstimatorClassifications(past_current_trial, modelParameters);
                 modelParameters = newParameters;
-            elseif nargout('positionEstimator') == 2
-                [decodedPosX, decodedPosY] = positionEstimator(past_current_trial, modelParameters);
+            elseif nargout('positionEstimatorClassifications') == 3
+                [decodedPosX, decodedPosY, label] = positionEstimatorClassifications(past_current_trial, modelParameters);
             end
             
             decodedPos = [decodedPosX; decodedPosY];
             decodedHandPos = [decodedHandPos decodedPos];
             
             meanSqError = meanSqError + norm(testData(tr,direc).handPos(1:2,t) - decodedPos)^2;
+            classifiedLabels = [classifiedLabels, label];
             
         end
         n_predictions = n_predictions+length(times);
         hold on
-        plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
-        plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
+%         plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
+%         plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
     end
 end
 
-legend('Decoded Position', 'Actual Position')
+elapsedTime = toc;
 
-RMSE = sqrt(meanSqError/n_predictions) 
+% legend('Decoded Position', 'Actual Position')
+
+RMSE = sqrt(meanSqError/n_predictions);
+classificationSuccessRate = 100 - ((sum(actualClassificationLabels ~= classifiedLabels) / size(actualClassificationLabels, 2)) * 100);
+
+fprintf('RMSE: %.2f\n', RMSE)
+fprintf('Time taken: %.2f\n', elapsedTime)
+fprintf('Classification success rate: %.2f%%\n', classificationSuccessRate)
 
 % rmpath(genpath(teamName))
 
