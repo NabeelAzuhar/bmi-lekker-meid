@@ -154,8 +154,8 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         trainProjected = testProjection' * (firingCurrent - overallMean); % training data projected onto LDA (6x2660) * (2660x800) = (6 x 800)
 
         %%% CLASSIFICATIONS %%%
-        % Classification = 'KNN', 'LinearSVM', 'KernelSVM'
-        [modelParameters] = train_classification('KernelSVM', modelParameters, trainProjected, testProjection, overallMean);
+        % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
+        [modelParameters] = train_classification('NaiveBayes', modelParameters, trainProjected, testProjection, overallMean);
         %%%
         disp(modelParameters)
 
@@ -328,6 +328,19 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
 
+    function [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean)
+        % Linear SVM Classification
+        directions = [1,2,3,4,5,6,7,8];
+        y_labels = repelem(directions, trial_split)';
+        nb_classifier = fitcnb(trainProjected', y_labels);
+        
+       % Store all the relevant weights for KNN
+        modelParameters.NaiveBayesClassify(intervalIdx).nb_classifier = nb_classifier;
+        modelParameters.NaiveBayesClassify(intervalIdx).testProjection = testProjection; % (2660 x 6)
+        modelParameters.NaiveBayesClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
+    end
+
+
     function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, overallMean)
         if strcmp(classification, 'KNN')
             [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, overallMean);
@@ -335,6 +348,8 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
             [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean);
         elseif strcmp(classification, 'KernelSVM')
             [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean);
+        elseif strcmp(classification, 'NaiveBayes')
+            [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean);
         end
     end
 

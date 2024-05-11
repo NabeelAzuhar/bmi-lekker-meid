@@ -35,8 +35,8 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     if timeTotal <= endTime % if total time is within the preset training time bins
 
         %%% Classify %%%
-        % Classification = 'KNN', 'LinearSVM', 'KernelSVM'
-        [label, firingMean] = classify('KernelSVM', modelParameters);
+        % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
+        [label, firingMean] = classify('NaiveBayes', modelParameters);
         modelParameters.actualLabel = label;
         %%%
 
@@ -244,6 +244,27 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
     labels = predict(ecoc_model, testMat);
     end
 
+
+    function [labels, firingMean] = calcNaiveBayes(modelParameters)
+    %----------------------------------------------------------------------
+    % calcKnns Predicts labels using k-nearest neighbors algorithm.
+    %   
+    %   Arguments:
+    %       testingData: DimLda x no. test trials (1), corresponding to the projection of the trial data onto LDA components               
+    %       ecoc_model: Pretrained Linear SVM model  
+    %
+    %   Returns:
+    %       labels: Reaching angle/direction labels of the testing data deduced with linear SVM      
+    %----------------------------------------------------------------------
+    testProjection = modelParameters.NaiveBayesClassify(binCount).testProjection; % (2660 x 6)
+    firingMean = modelParameters.NaiveBayesClassify(binCount).meanFiring; % mean firing rate % (2660 x 1)
+    testLDA = testProjection' * (firingData - firingMean); % (6 x 1), test data projected onto LDA components
+    nb_classifier = modelParameters.NaiveBayesClassify(binCount).nb_classifier;
+    testMat = testLDA'; % testing data projected onto LDA
+    % Predict labels
+    labels = predict(nb_classifier, testMat);
+    end
+
     
     function [labels, firingMean] = classify(classification, modelParameters)
         if strcmp(classification, 'KNN')
@@ -252,6 +273,8 @@ function [x, y, modelParameters]= positionEstimatorClassifications(testData, mod
             [labels, firingMean] = calcLinearSVM(modelParameters);
         elseif strcmp(classification, 'KernelSVM')
             [labels, firingMean] = calcKernelSVM(modelParameters);
+        elseif strcmp(classification, 'NaiveBayes')
+            [labels, firingMean] = calcNaiveBayes(modelParameters);
         end
     end
 
