@@ -41,7 +41,6 @@ function [modelParameters] = positionEstimatorTraining(trainingData)
     % labels for selecting data for a selected angle from firing Data
     labels = repmat(1:numDirections, numTrials, 1);
     labels = labels(:);
-
    
 % 1. Data Pre-processing
     dataProcessed = dataProcessor(trainingData, binSize, window); % dataProcessed.rates = firing rates
