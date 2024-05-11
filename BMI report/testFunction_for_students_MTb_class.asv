@@ -24,7 +24,6 @@ fprintf('Testing the continuous position estimator...')
 meanSqError = 0;
 n_predictions = 0;  
 actualClassificationLabels = [];
-classifiedLabels = [];
 
 figure
 hold on
@@ -62,7 +61,6 @@ for tr=1:size(testData,1)
             decodedHandPos = [decodedHandPos decodedPos];
             
             meanSqError = meanSqError + norm(testData(tr,direc).handPos(1:2,t) - decodedPos)^2;
-            classifiedLabels = [classifiedLabels, label];
             
         end
         n_predictions = n_predictions+length(times);
@@ -74,11 +72,10 @@ end
 
 legend('Decoded Position', 'Actual Position')
 
-RMSE = sqrt(meanSqError/n_predictions);
-classificationSuccessRate = 100 - ((sum(actualClassificationLabels ~= classifiedLabels) / size(actualClassificationLabels, 2)) * 100);
+RMSE = sqrt(meanSqError/n_predictions) 
 
-fprintf('RMSE: %.2f\n', RMSE)
-fprintf('Classification success rate: %.2f%%\n', classificationSuccessRate)
+disp(size(actualClassificationLabels))
+disp(size(classifiedLabels))
 
 % rmpath(genpath(teamName))
 

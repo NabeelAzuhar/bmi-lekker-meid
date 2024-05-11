@@ -1,7 +1,7 @@
 % Last edit: 19/03/22
 % Authors: Nabeel Azuhar Mohammed, Gloria Sun, Ioana Lazar, Alexia Badea
 
-function [x, y, modelParameters]= positionEstimatorClassifications(testData, modelParameters, trial_split)
+function [x, y, modelParameters, label]= positionEstimatorClassifications(testData, modelParameters)
 
     % ---------------------------------------------------------------------
     % Inputs:
