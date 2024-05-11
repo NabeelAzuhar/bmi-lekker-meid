@@ -31,6 +31,7 @@ hold on
 axis square
 grid
 
+tic;
 % Train Model
 modelParameters = positionEstimatorTrainingClassification(trainingData, trial_split);
 
@@ -72,12 +73,15 @@ for tr=1:size(testData,1)
     end
 end
 
+elapsedTime = toc;
+
 legend('Decoded Position', 'Actual Position')
 
 RMSE = sqrt(meanSqError/n_predictions);
 classificationSuccessRate = 100 - ((sum(actualClassificationLabels ~= classifiedLabels) / size(actualClassificationLabels, 2)) * 100);
 
 fprintf('RMSE: %.2f\n', RMSE)
+fprintf('Time taken: %.2f\n', elapsedTime)
 fprintf('Classification success rate: %.2f%%\n', classificationSuccessRate)
 
 % rmpath(genpath(teamName))
