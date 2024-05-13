@@ -105,51 +105,101 @@ function [x, y, modelParameters, label]= positionEstimatorReport(testData, model
         
     % Initialisations
         dataProcessed = struct; % output
-        numNeurons = size(data(1,1).spikes, 1);
+        numNeurons = size(data(1,1).spikes, 1); 
         
     % Binning & Squarerooting - 20ms bins, sqrt to avoid large values
         for angle = 1 : size(data, 2)
             for trial = 1 : size(data, 1)
          
-                % initialisations
+                % Initialisations
                 spikeData = data(trial, angle).spikes; % extract spike data (98 x time steps)
-                totalTime = size(spikeData, 2); % total number of time steps
-                binStarts = 1 : binSize : totalTime+1; % starting time stamps of each bin
-                spikeBins = zeros(numNeurons, numel(binStarts)-1); % binned data, (98 x number of bins)
-                
-                % bin then squareroot the data            
-                for bin = 1 : numel(binStarts)-1 % iterate through each bin
-                    spikeBins(:, bin) = sum(spikeData(:, binStarts(bin):binStarts(bin+1)-1), 2); % sum spike number
+                handPosData = data(trial, angle).handPos; % extract handPos data
+                totalTime = size(spikeData, 2); % total number of time steps in ms
+                binIndices = 1 : binSize : totalTime+1; % start of each time bin in ms
+                spikeBins = zeros(numNeurons, length(binIndices)-1); % initialised binned spike data, (98 x number of bins)
+                handPosBins = zeros(2, length(binIndices)-1); % initialised handPos data (2 directions x number of bins)
+
+                % bin then squareroot the spike data            
+                for bin = 1 : length(binIndices) - 1 % iterate through each bin
+                    spikeBins(:, bin) = sum(spikeData(:, binIndices(bin):binIndices(bin+1)-1), 2); % sum spike number
+                    handPosBins(:, bin) = mean(handPosData(1:2, binIndices(bin):binIndices(bin+1)-1), 2); % sample the hand position at the beginning of each bin
+                    % handPosBins(:, bin)= handPosData(1:2, binIndices(bin));
                 end
                 spikeBins = sqrt(spikeBins);
+                % spikeBins = log(1+spikeBins);
+                % spikeBins = 2*sqrt(spikeBins + 3/8);
 
                 % fill up the output
                 dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
+                dataProcessed(trial, angle).handPos = handPosBins; % select only x and y
             end
         end
+    
+        % Gaussian Smoothing
+        % Convert spike count per bin into firing rate + Gaussian window for smoothing
+            % Generating the Gaussian window
+            windowWidth = 10 * (window/binSize); % width of gaussian window
+            std = window/binSize; % normalised std
+            alpha = (windowWidth-1) / (2*std); % determines spread of curve (exp coefficient)
+            tmp = -(windowWidth-1)/2 : (windowWidth-1)/2; % symmetric vector ranging about 0
+            gaussTemp = exp((-1/2) * (alpha*tmp/((windowWidth-1)/2)).^2)'; % gaussian window
+            gaussWindow = gaussTemp/sum(gaussTemp); % normalised gaussian window, FINAL to use
 
-    % Convert spike count per bin into firing rate + Gaussian window for smoothing
-        % Generating the Gaussian window
-        windowWidth = 10 * (window/binSize); % width of gaussian window
-        std = window/binSize; % normalised std
-        alpha = (windowWidth-1) / (2*std); % determines spread of curve (exp coefficient)
-        tmp = -(windowWidth-1)/2 : (windowWidth-1)/2; % symmetric vector ranging about 0
-        gaussTemp = exp((-1/2) * (alpha*tmp/((windowWidth-1)/2)).^2)'; % gaussian window
-        gaussWindow = gaussTemp/sum(gaussTemp); % normalised gaussian window, FINAL to use
+            % add smoothened firing rates to the processed data
+            for angle = 1 : size(dataProcessed, 2)
+                for trial = 1 : size(dataProcessed, 1)
+                    % rates field to be added
+                    firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
 
-        % add smoothened firing rates to the processed data
-        for angle = 1 : size(dataProcessed, 2)
-            for trial = 1 : size(dataProcessed, 1)
-                % rates field to be added
-                firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
-                
-                % convolve window with each neuron for smoothing
-                for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
-                    firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), gaussWindow, 'same') / (binSize/1000);
+                    % convolve window with each neuron for smoothing
+                    for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
+                        firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), gaussWindow, 'same') / (binSize/1000);
+                    end
+                    dataProcessed(trial, angle).rates = firingRates; % add rates as a new field to processed data
                 end
-                dataProcessed(trial, angle).rates = firingRates; % add rates as a new field to processed data
             end
-        end
+
+        % % Rectangular Smoothing
+        % % Generating the Rectangular window
+        % windowWidth = 10 * (window/binSize); % define the width of the rectangular window
+        % rectWindow = ones(1, windowWidth) / windowWidth; % create a rectangular window and normalize it
+        % 
+        % % add smoothed firing rates to the processed data
+        % for angle = 1 : size(dataProcessed, 2)
+        %     for trial = 1 : size(dataProcessed, 1)
+        %         firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
+        %         % convolve window with each neuron for smoothing
+        %         for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
+        %             firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), rectWindow, 'same') / (binSize/1000);
+        %         end
+        %         dataProcessed(trial, angle).rates = firingRates; % add rates as a new field to processed data
+        %     end
+        % end
+
+        % % Triangular smoothing
+        % % Define the width of the triangular window
+        % windowWidth = 10 * (window/binSize); % Adjust 'window' and 'binSize' as per your setup
+        % % Create a triangular window
+        % triWindow = triang(windowWidth);
+        % % Normalize the window to ensure its sum equals one
+        % triWindow = triWindow / sum(triWindow);
+        % 
+        % % Loop through trials and angles
+        % for angle = 1 : size(dataProcessed, 2)
+        %     for trial = 1 : size(dataProcessed, 1)
+        %         % Preallocate firingRates array for storing smoothed data
+        %         firingRates = zeros(size(dataProcessed(trial, angle).spikes, 1), size(dataProcessed(trial, angle).spikes, 2));
+        % 
+        %         % Convolve the spike data with the triangular window for each neuron
+        %         for neuron = 1 : size(dataProcessed(trial, angle).spikes, 1)
+        %             % Perform convolution and normalize by the bin size converted to seconds
+        %             firingRates(neuron, :) = conv(dataProcessed(trial, angle).spikes(neuron, :), triWindow, 'same') / (binSize/1000);
+        %         end
+        % 
+        %         % Store the computed firing rates back into the processed data structure
+        %         dataProcessed(trial, angle).rates = firingRates;
+        %     end
+        % end
 
     end % end of function dataProcessor
 
