@@ -22,7 +22,8 @@ testData = trial(ix(trial_split:end),:);
 fprintf('Testing the continuous position estimator...')
 
 meanSqError = 0;
-n_predictions = 0;  
+n_predictions = 0;
+errors = [];
 actualClassificationLabels = [];
 classifiedLabels = [];
 
@@ -63,6 +64,7 @@ for tr=1:size(testData,1)
             decodedHandPos = [decodedHandPos decodedPos];
             
             meanSqError = meanSqError + norm(testData(tr,direc).handPos(1:2,t) - decodedPos)^2;
+            errors = [errors, testData(tr,direc).handPos(1:2,t) - decodedPos];
             classifiedLabels = [classifiedLabels, label];
             
         end
@@ -79,10 +81,14 @@ elapsedTime = toc;
 
 RMSE = sqrt(meanSqError/n_predictions);
 classificationSuccessRate = 100 - ((sum(actualClassificationLabels ~= classifiedLabels) / size(actualClassificationLabels, 2)) * 100);
+stdDevX = std(errors(1,:));
+stdDevY = std(errors(2,:));
 
 fprintf('RMSE: %.2f\n', RMSE)
 fprintf('Time taken: %.2f\n', elapsedTime)
 fprintf('Classification success rate: %.2f%%\n', classificationSuccessRate)
+fprintf('Standard Deviation: %.2f\n', stdDevX)
+fprintf('Standard Deviation: %.2f\n', stdDevY)
 
 % rmpath(genpath(teamName))
 

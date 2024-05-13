@@ -4,7 +4,7 @@
 % the relevant modelParameters, and then calls the function
 % "positionEstimator" to decode the trajectory. 
 
-function RMSE = testFunction_for_students_MTb_class(teamName)
+function errors = testFunction_for_students_MTb_report(teamName)
 
 load monkeydata_training.mat
 
@@ -34,7 +34,7 @@ grid
 
 tic;
 % Train Model
-modelParameters = positionEstimatorTrainingClassification(trainingData);
+modelParameters = positionEstimatorTrainingReport(trainingData);
 
 for tr=1:size(testData,1)
     display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);
@@ -53,11 +53,11 @@ for tr=1:size(testData,1)
 
             past_current_trial.startHandPos = testData(tr,direc).handPos(1:2,1); 
             
-            if nargout('positionEstimatorClassifications') == 4
-                [decodedPosX, decodedPosY, newParameters, label] = positionEstimatorClassifications(past_current_trial, modelParameters);
+            if nargout('positionEstimatorReport') == 4
+                [decodedPosX, decodedPosY, newParameters, label] = positionEstimatorReport(past_current_trial, modelParameters);
                 modelParameters = newParameters;
-            elseif nargout('positionEstimatorClassifications') == 3
-                [decodedPosX, decodedPosY, label] = positionEstimatorClassifications(past_current_trial, modelParameters);
+            elseif nargout('positionEstimatorReport') == 3
+                [decodedPosX, decodedPosY, label] = positionEstimatorReport(past_current_trial, modelParameters);
             end
             
             decodedPos = [decodedPosX; decodedPosY];
@@ -70,8 +70,8 @@ for tr=1:size(testData,1)
         end
         n_predictions = n_predictions+length(times);
         hold on
-%         plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
-%         plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
+        plot(decodedHandPos(1,:),decodedHandPos(2,:), 'r');
+        plot(testData(tr,direc).handPos(1,times),testData(tr,direc).handPos(2,times),'b')
     end
 end
 
@@ -87,8 +87,7 @@ stdDevY = std(errors(2,:));
 fprintf('RMSE: %.2f\n', RMSE)
 fprintf('Time taken: %.2f\n', elapsedTime)
 fprintf('Classification success rate: %.2f%%\n', classificationSuccessRate)
-fprintf('Standard Deviation: %.2f\n', stdDevX)
-fprintf('Standard Deviation: %.2f\n', stdDevY)
+% fprintf('Standard Deviation: %.2f\n', stdDev)
 
 % rmpath(genpath(teamName))
 
