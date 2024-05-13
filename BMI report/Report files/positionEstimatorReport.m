@@ -47,7 +47,7 @@ function [x, y, modelParameters, label]= positionEstimatorReport(testData, model
  
         %%% Classify %%%
         % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
-        [label, firingMean] = classify('LinearSVM', modelParameters);
+        [label, firingMean] = classify('NaiveBayes', modelParameters);
         modelParameters.actualLabel = label;
         %%%
     

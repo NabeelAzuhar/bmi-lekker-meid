@@ -220,7 +220,7 @@ function [modelParameters] = positionEstimatorTrainingReport(trainingData)
 
         %%% CLASSIFICATIONS %%%
         % Classification = 'KNN', 'LinearSVM', 'KernelSVM', 'NaiveBayes'
-        [modelParameters] = train_classification('LinearSVM', modelParameters, trainProjected, testProjection, overallMean, numTrials);
+        [modelParameters] = train_classification('NaiveBayes', modelParameters, trainProjected, testProjection, overallMean, numTrials);
         %%%
         disp(modelParameters)
 
