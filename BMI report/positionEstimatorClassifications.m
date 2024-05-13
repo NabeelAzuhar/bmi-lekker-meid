@@ -43,7 +43,7 @@ function [x, y, modelParameters, label]= positionEstimatorClassifications(testDa
     
     else % if time goes beyond what's been trained, just keep using the parameters derived with the largest length of training time
         label = modelParameters.actualLabel;
-        modelParameters.actualLabel = label;
+%         modelParameters.actualLabel = label;
      
     end % end of classification
  

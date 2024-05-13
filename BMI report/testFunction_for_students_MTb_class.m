@@ -33,7 +33,7 @@ grid
 
 tic;
 % Train Model
-modelParameters = positionEstimatorTrainingClassification(trainingData, trial_split);
+modelParameters = positionEstimatorTrainingClassification(trainingData);
 
 for tr=1:size(testData,1)
     display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);

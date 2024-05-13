@@ -1,4 +1,4 @@
-function [modelParameters] = positionEstimatorTrainingClassification(trainingData, trial_split)
+function [modelParameters] = positionEstimatorTrainingClassification(trainingData)
 
 %--------------------------------------------------------------------------
     % Arguments:
@@ -160,9 +160,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
             desired_explained_variance = 70; % Set desired explained variance percentage
             num_components = find(cumulative_explained >= desired_explained_variance, 1);
             firingCurrent_pca = firingCurrent' * coeff(:, 1:num_components);
+            disp(size(firingCurrent_pca))
             
             num_subsets = 8;
-            subset_size = trial_split;
+            subset_size = numTrials;
             
             % PCA plot
             fig = figure;
@@ -345,10 +346,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         modelParameters.knnClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
     end
 
-    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         svm_template = templateSVM('KernelFunction', 'linear');
         ecoc_model = fitcecoc(trainProjected', y_labels, 'Learners', svm_template);
         
@@ -359,10 +360,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
     
-    function [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         svm_template = templateSVM('KernelFunction', 'rbf','BoxConstraint', 100, 'KernelScale', 100);
         ecoc_model = fitcecoc(trainProjected', y_labels, 'Learners', svm_template);
         
@@ -373,10 +374,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
 
-    function [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         nb_classifier = fitcnb(trainProjected', y_labels);
         
        % Store all the relevant weights for KNN
@@ -386,15 +387,15 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
 
-    function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = train_classification(classification, modelParameters, trainProjected, testProjection, overallMean, numTrials)
         if strcmp(classification, 'KNN')
             [modelParameters] = saveKNN(modelParameters, trainProjected, testProjection, overallMean);
         elseif strcmp(classification, 'LinearSVM')
-            [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean);
+            [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials);
         elseif strcmp(classification, 'KernelSVM')
-            [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean);
+            [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials);
         elseif strcmp(classification, 'NaiveBayes')
-            [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean);
+            [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean, numTrials);
         end
     end
 

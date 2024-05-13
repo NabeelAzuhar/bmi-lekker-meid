@@ -1,4 +1,4 @@
-function [modelParameters] = positionEstimatorTrainingClassification(trainingData, trial_split)
+function [modelParameters] = positionEstimatorTrainingClassification(trainingData)
 
 %--------------------------------------------------------------------------
     % Arguments:
@@ -160,39 +160,43 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
             desired_explained_variance = 70; % Set desired explained variance percentage
             num_components = find(cumulative_explained >= desired_explained_variance, 1);
             firingCurrent_pca = firingCurrent' * coeff(:, 1:num_components);
+            disp(size(firingCurrent_pca))
             
             num_subsets = 8;
-            subset_size = trial_split;
+            subset_size = numTrials;
             
             % PCA plot
-            figure;
-            subp
-            hold on; % Hold the plot to overlay multiple plots
+            fig = figure;
+            subplot(1,2,1);
+            hold on;
             for i = 1:num_subsets
                 subset_start = (i - 1) * subset_size + 1;
                 subset_end = i * subset_size;
                 plot(firingCurrent_pca(subset_start:subset_end, 1), firingCurrent_pca(subset_start:subset_end, 2), '.', 'MarkerSize', 10);
             end
-            hold off; % Release the hold on the plot
-            legend('Angle 1', 'Angle 2', 'Angle 3', 'Angle 4', 'Angle 5', 'Angle 6', 'Angle 7', 'Angle 8', 'Location', 'eastoutside', 'Orientation', 'vertical');
+            hold off;
             xlabel('PCA 1'); 
             ylabel('PCA 2');
             title('PCA Plot of Neuronal Activity');
 
             % LDA plot
-            figure;
-            hold on; % Hold the plot to overlay multiple plots
+            subplot(1,2,2);
+            hold on;
             LDAData = trainProjected';
             for i = 1:num_subsets
                 subset_start = (i - 1) * subset_size + 1;
                 subset_end = i * subset_size;
                 plot(LDAData(subset_start:subset_end, 1), LDAData(subset_start:subset_end, 2), '.', 'MarkerSize', 10);
             end
-            hold off; % Release the hold on the plot
-            legend('Angle 1', 'Angle 2', 'Angle 3', 'Angle 4', 'Angle 5', 'Angle 6', 'Angle 7', 'Angle 8', 'Location', 'eastoutside', 'Orientation', 'vertical');
+            hold off;
             xlabel('LDA 1'); 
             ylabel('LDA 2');
             title('LDA Plot of Neuronal Activity');
+
+            fig = gcf;
+            fig.Position(4) = fig.Position(4) + 50;
+
+            legend('Angle 1', 'Angle 2', 'Angle 3', 'Angle 4', 'Angle 5', 'Angle 6', 'Angle 7', 'Angle 8', 'Location', 'southoutside', 'Orientation', 'horizontal');
         end
 
         %%% CLASSIFICATIONS %%%
@@ -342,10 +346,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
         modelParameters.knnClassify(intervalIdx).meanFiring = overallMean; % (2660 x 1), mean rate for each neuron-bin
     end
 
-    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveLinearSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         svm_template = templateSVM('KernelFunction', 'linear');
         ecoc_model = fitcecoc(trainProjected', y_labels, 'Learners', svm_template);
         
@@ -356,10 +360,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
     
-    function [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveKernelSVM(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         svm_template = templateSVM('KernelFunction', 'rbf','BoxConstraint', 100, 'KernelScale', 100);
         ecoc_model = fitcecoc(trainProjected', y_labels, 'Learners', svm_template);
         
@@ -370,10 +374,10 @@ function [modelParameters] = positionEstimatorTrainingClassification(trainingDat
     end
 
 
-    function [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean)
+    function [modelParameters] = saveNaiveBayes(modelParameters, trainProjected, testProjection, overallMean, numTrials)
         % Linear SVM Classification
         directions = [1,2,3,4,5,6,7,8];
-        y_labels = repelem(directions, trial_split)';
+        y_labels = repelem(directions, numTrials)';
         nb_classifier = fitcnb(trainProjected', y_labels);
         
        % Store all the relevant weights for KNN
