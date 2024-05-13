@@ -121,9 +121,9 @@ function [x, y, modelParameters, label]= positionEstimatorReport(testData, model
                 for bin = 1 : numel(binStarts)-1 % iterate through each bin
                     spikeBins(:, bin) = sum(spikeData(:, binStarts(bin):binStarts(bin+1)-1), 2); % sum spike number
                 end
-                % spikeBins = sqrt(spikeBins);
+                spikeBins = sqrt(spikeBins);
                 % spikeBins = log(1+spikeBins);
-                spikeBins = 2*sqrt(spikeBins + 3/8);
+                % spikeBins = 2*sqrt(spikeBins + 3/8);
 
                 % fill up the output
                 dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned

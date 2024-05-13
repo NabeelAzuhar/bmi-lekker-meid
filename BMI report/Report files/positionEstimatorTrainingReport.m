@@ -373,9 +373,9 @@ function [modelParameters] = positionEstimatorTrainingReport(trainingData)
                     spikeBins(:, bin) = sum(spikeData(:, binIndices(bin):binIndices(bin+1)-1), 2); % sum spike number
                     handPosBins(:, bin) = mean(handPosData(1:2, binIndices(bin):binIndices(bin+1)-1), 2); % sample the hand position at the beginning of each bin
                 end
-                % spikeBins = sqrt(spikeBins);
+                spikeBins = sqrt(spikeBins);
                 % spikeBins = log(1+spikeBins);
-                spikeBins = 2*sqrt(spikeBins + 3/8);
+                % spikeBins = 2*sqrt(spikeBins + 3/8);
 
                 % fill up the output
                 dataProcessed(trial, angle).spikes = spikeBins; % spikes are now binned
