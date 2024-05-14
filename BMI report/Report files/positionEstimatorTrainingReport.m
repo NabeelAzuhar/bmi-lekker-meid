@@ -25,7 +25,7 @@ function [modelParameters] = positionEstimatorTrainingReport(trainingData)
     numNeurons = size(trainingData(1, 1).spikes, 1); % stays constant throughout
     [numTrials, numDirections] = size(trainingData);
     binSize = 20; % binning resolution (ms)
-    window = 30; % smoothing gaussian window std (ms)
+    window = 40; % smoothing gaussian window std (ms)
     startTime = 320; % start time of testing (ms)
     endTime = 560; % smallest time length in training data rounded to time bin of 20ms
     nHistBins = 10; % number of past feature bins used to predict current position
@@ -40,8 +40,6 @@ function [modelParameters] = positionEstimatorTrainingReport(trainingData)
     numNeurons = size(trainingData(1, 1).spikes, 1); % stays constant throughout
     numTrials = size(trainingData, 1);
     numDirections = size(trainingData, 2);
-    binSize = 20; % manually set bin size for data binning, 28 bins
-    window = 30; % manually set window length for smoothing
     modelParameters.binSize = binSize;
     modelParameters.window = window;
     
